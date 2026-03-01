@@ -1,0 +1,634 @@
+
+> cycling-dashboard-app@0.0.0 dev
+> vite --debug
+
+2026-02-28T17:25:05.321Z vite:config bundled config file loaded in 44.99ms
+2026-02-28T17:25:05.333Z vite:config using resolved config: {
+  plugins: [
+    'vite:optimized-deps',
+    'vite:watch-package-data',
+    'vite:pre-alias',
+    'alias',
+    'vite:react-babel',
+    'vite:react-refresh',
+    'vite:modulepreload-polyfill',
+    'vite:resolve',
+    'vite:html-inline-proxy',
+    'vite:css',
+    'vite:esbuild',
+    'vite:json',
+    'vite:wasm-helper',
+    'vite:worker',
+    'vite:asset',
+    'vite:wasm-fallback',
+    'vite:define',
+    'vite:css-post',
+    'vite:worker-import-meta-url',
+    'vite:asset-import-meta-url',
+    'vite:dynamic-import-vars',
+    'vite:import-glob',
+    'vite:client-inject',
+    'vite:css-analysis',
+    'vite:import-analysis'
+  ],
+  optimizeDeps: {
+    holdUntilCrawlEnd: true,
+    force: undefined,
+    esbuildOptions: { preserveSymlinks: false, jsx: 'automatic' },
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-dev-runtime',
+      'react/jsx-runtime'
+    ]
+  },
+  server: {
+    preTransformRequests: true,
+    host: undefined,
+    sourcemapIgnoreList: [Function: isInNodeModules$1],
+    middlewareMode: false,
+    fs: {
+      strict: true,
+      allow: [Array],
+      deny: [Array],
+      cachedChecks: undefined
+    }
+  },
+  esbuild: { jsxDev: true, jsx: 'automatic', jsxImportSource: undefined },
+  build: {
+    target: [ 'es2020', 'edge88', 'firefox78', 'chrome87', 'safari14' ],
+    cssTarget: [ 'es2020', 'edge88', 'firefox78', 'chrome87', 'safari14' ],
+    outDir: 'dist',
+    assetsDir: 'assets',
+    assetsInlineLimit: 4096,
+    cssCodeSplit: true,
+    sourcemap: false,
+    rollupOptions: { onwarn: [Function: onwarn] },
+    minify: 'esbuild',
+    terserOptions: {},
+    write: true,
+    emptyOutDir: null,
+    copyPublicDir: true,
+    manifest: false,
+    lib: false,
+    ssr: false,
+    ssrManifest: false,
+    ssrEmitAssets: false,
+    reportCompressedSize: true,
+    chunkSizeWarningLimit: 500,
+    watch: null,
+    commonjsOptions: { include: [Array], extensions: [Array] },
+    dynamicImportVarsOptions: { warnOnError: true, exclude: [Array] },
+    modulePreload: { polyfill: true },
+    cssMinify: true
+  },
+  resolve: {
+    mainFields: [ 'browser', 'module', 'jsnext:main', 'jsnext' ],
+    conditions: [],
+    extensions: [
+      '.mjs',  '.js',
+      '.mts',  '.ts',
+      '.jsx',  '.tsx',
+      '.json'
+    ],
+    dedupe: [ 'react', 'react-dom' ],
+    preserveSymlinks: false,
+    alias: [ [Object], [Object] ]
+  },
+  configFile: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/vite.config.js',
+  configFileDependencies: [
+    'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/vite.config.js'
+  ],
+  inlineConfig: {
+    root: undefined,
+    base: undefined,
+    mode: undefined,
+    configFile: undefined,
+    logLevel: undefined,
+    clearScreen: undefined,
+    optimizeDeps: { force: undefined },
+    server: { host: undefined }
+  },
+  root: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app',
+  base: '/',
+  decodedBase: '/',
+  rawBase: '/',
+  publicDir: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/public',
+  cacheDir: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite',
+  command: 'serve',
+  mode: 'development',
+  ssr: {
+    target: 'node',
+    optimizeDeps: { noDiscovery: true, esbuildOptions: [Object] }
+  },
+  isWorker: false,
+  mainConfig: null,
+  bundleChain: [],
+  isProduction: false,
+  css: { lightningcss: undefined },
+  preview: {
+    port: undefined,
+    strictPort: undefined,
+    host: undefined,
+    allowedHosts: undefined,
+    https: undefined,
+    open: undefined,
+    proxy: undefined,
+    cors: undefined,
+    headers: undefined
+  },
+  envDir: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app',
+  env: {
+    VITE_SUPABASE_URL: 'https://ejekklaxazkxkbrzcbek.supabase.co',
+    VITE_SUPABASE_ANON_KEY: 'sb_publishable_exrKkrUHQckepMIcnNbfig_bT_HQZKn.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqZWtrbGF4YXpreGticnpjYmVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyOTIzODgsImV4cCI6MjA4Nzg2ODM4OH0.kOlnMuHmbKo5PirmvlIhdhanE9z8LOCRqXxyOSCdEFU',
+    BASE_URL: '/',
+    MODE: 'development',
+    DEV: true,
+    PROD: false
+  },
+  assetsInclude: [Function: assetsInclude],
+  logger: {
+    hasWarned: false,
+    info: [Function: info],
+    warn: [Function: warn],
+    warnOnce: [Function: warnOnce],
+    error: [Function: error],
+    clearScreen: [Function: clearScreen],
+    hasErrorLogged: [Function: hasErrorLogged]
+  },
+  packageCache: Map(1) {
+    'fnpd_C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app' => {
+      dir: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app',
+      data: [Object],
+      hasSideEffects: [Function: hasSideEffects],
+      webResolvedImports: {},
+      nodeResolvedImports: {},
+      setResolvedCache: [Function: setResolvedCache],
+      getResolvedCache: [Function: getResolvedCache]
+    },
+    set: [Function (anonymous)]
+  },
+  createResolver: [Function: createResolver],
+  worker: { format: 'iife', plugins: '() => plugins', rollupOptions: {} },
+  appType: 'spa',
+  experimental: { importGlobRestoreExtension: false, hmrPartialAccept: false },
+  webSocketToken: 'wr1IV7mw7hxw',
+  additionalAllowedHosts: [],
+  getSortedPlugins: [Function: getSortedPlugins],
+  getSortedPluginHooks: [Function: getSortedPluginHooks]
+}
+2026-02-28T17:25:05.356Z vite:deps removing old cache dir C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps
+2026-02-28T17:25:05.361Z vite:resolve 1.83ms react -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react/index.js
+2026-02-28T17:25:05.362Z vite:resolve 0.90ms react-dom -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react-dom/index.js
+2026-02-28T17:25:05.363Z vite:resolve 0.52ms react/jsx-dev-runtime -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react/jsx-dev-runtime.js
+2026-02-28T17:25:05.363Z vite:resolve 0.27ms react/jsx-runtime -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react/jsx-runtime.js
+2026-02-28T17:25:05.364Z vite:deps scanning for dependencies...
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m294[22m[2m[0m ms[22m
+
+  [32mÔ×£[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32mÔ×£[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m[32m  Ô×£[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+2026-02-28T17:25:05.375Z vite:deps Crawling dependencies using entries: 
+  C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/index.html
+2026-02-28T17:25:05.698Z vite:resolve 0.37ms /src/main.tsx -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/main.tsx
+2026-02-28T17:25:05.703Z vite:resolve 1.23ms react -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react/index.js
+2026-02-28T17:25:05.704Z vite:resolve 0.57ms react-dom/client -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react-dom/client.js
+2026-02-28T17:25:05.705Z vite:resolve 0.28ms ./App.tsx -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/App.tsx
+2026-02-28T17:25:05.706Z vite:resolve 0.29ms react/jsx-runtime -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react/jsx-runtime.js
+2026-02-28T17:25:05.708Z vite:resolve 0.51ms ./components/AuthUI -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/components/AuthUI.tsx
+2026-02-28T17:25:05.709Z vite:resolve 0.60ms ./components/Dashboard -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/components/Dashboard.tsx
+2026-02-28T17:25:05.711Z vite:resolve 0.36ms ../lib/supabase -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/lib/supabase.ts
+2026-02-28T17:25:05.712Z vite:resolve 0.81ms @supabase/auth-ui-react -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/auth-ui-react/dist/index.es.js
+2026-02-28T17:25:05.713Z vite:resolve 0.78ms @supabase/auth-ui-shared -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/auth-ui-shared/dist/index.mjs
+2026-02-28T17:25:05.714Z vite:resolve 0.81ms @supabase/supabase-js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/supabase-js/dist/index.mjs
+2026-02-28T17:25:05.726Z vite:deps Scan completed in 361.40ms: 
+  @supabase/auth-ui-react -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/auth-ui-react/dist/index.es.js
+  @supabase/auth-ui-shared -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/auth-ui-shared/dist/index.mjs
+  @supabase/supabase-js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/supabase-js/dist/index.mjs
+  react -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react/index.js
+  react-dom/client -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react-dom/client.js
+  react/jsx-runtime -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react/jsx-runtime.js
+2026-02-28T17:25:05.727Z vite:deps creating package.json in C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps_temp_c9d66ceb
+2026-02-28T17:25:05.756Z vite:resolve 1.80ms react-dom -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react-dom/index.js
+2026-02-28T17:25:05.761Z vite:hmr [file change] vite_error.log
+2026-02-28T17:25:05.761Z vite:hmr [no modules matched] vite_error.log
+2026-02-28T17:25:05.766Z vite:resolve 2.03ms @supabase/functions-js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/functions-js/dist/module/index.js
+2026-02-28T17:25:05.769Z vite:resolve 2.05ms @stitches/core -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@stitches/core/dist/index.mjs
+2026-02-28T17:25:05.769Z vite:resolve 2.09ms @supabase/postgrest-js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/postgrest-js/dist/index.mjs
+2026-02-28T17:25:05.771Z vite:resolve 1.10ms @supabase/auth-ui-shared -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/auth-ui-shared/dist/index.mjs
+2026-02-28T17:25:05.772Z vite:resolve 1.10ms @supabase/realtime-js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/realtime-js/dist/module/index.js
+2026-02-28T17:25:05.773Z vite:resolve 0.70ms react -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react/index.js
+2026-02-28T17:25:05.774Z vite:resolve 0.75ms @supabase/storage-js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/storage-js/dist/index.mjs
+2026-02-28T17:25:05.775Z vite:resolve 1.11ms @supabase/auth-js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/@supabase/auth-js/dist/module/index.js
+2026-02-28T17:25:05.781Z vite:resolve 1.03ms react -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/react/index.js
+2026-02-28T17:25:05.808Z vite:resolve 1.81ms iceberg-js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/iceberg-js/dist/index.mjs
+2026-02-28T17:25:05.846Z vite:resolve 1.72ms tslib -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/tslib/tslib.es6.mjs
+2026-02-28T17:25:05.943Z vite:resolve 1.30ms scheduler -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/scheduler/index.js
+2026-02-28T17:25:06.093Z vite:deps Dependencies bundled in 364.15ms
+2026-02-28T17:25:14.535Z vite:hmr [file change] vite_error.log
+2026-02-28T17:25:14.535Z vite:hmr [no modules matched] vite_error.log
+2026-02-28T17:25:34.595Z vite:hmr [file change] vite.config.js.timestamp-1772299534591-59c4875e10942.mjs
+2026-02-28T17:25:34.595Z vite:hmr [no modules matched] vite.config.js.timestamp-1772299534591-59c4875e10942.mjs
+2026-02-28T17:25:34.597Z vite:hmr [file change] vite_error.log
+2026-02-28T17:25:34.597Z vite:hmr [no modules matched] vite_error.log
+2026-02-28T17:25:34.720Z vite:hmr [file change] vite.config.js.timestamp-1772299534591-59c4875e10942.mjs
+2026-02-28T17:25:34.720Z vite:hmr [no modules matched] vite.config.js.timestamp-1772299534591-59c4875e10942.mjs
+2026-02-28T17:25:46.666Z vite:hmr [file change] vite_error.log
+2026-02-28T17:25:46.667Z vite:hmr [no modules matched] vite_error.log
+2026-02-28T17:26:02.703Z vite:hmr [file change] src/App.tsx
+2026-02-28T17:26:02.703Z vite:hmr [no modules matched] src/App.tsx
+2026-02-28T17:26:04.635Z vite:hmr [file change] vite_error.log
+2026-02-28T17:26:04.635Z vite:hmr [no modules matched] vite_error.log
+2026-02-28T17:26:30.507Z vite:html-fallback Rewriting GET / to /index.html
+2026-02-28T17:26:30.523Z vite:time 18.52ms /index.html
+2026-02-28T17:26:30.525Z vite:resolve 2.63ms /src/main.tsx -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/main.tsx
+2026-02-28T17:26:30.529Z vite:load 3.27ms [fs] /src/main.tsx
+2026-02-28T17:26:30.760Z vite:resolve 0.52ms /@vite/client -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/vite/dist/client/client.mjs
+2026-02-28T17:26:30.762Z vite:load 0.23ms [plugin] /@react-refresh
+2026-02-28T17:26:30.765Z vite:import-analysis 1.03ms [0 imports rewritten] /@react-refresh
+2026-02-28T17:26:30.765Z vite:transform 3.23ms /@react-refresh
+2026-02-28T17:26:30.772Z vite:time 10.24ms /@react-refresh
+2026-02-28T17:26:30.775Z vite:load 14.64ms [fs] /@vite/client
+2026-02-28T17:26:30.783Z vite:resolve 0.14ms @vite/env -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/vite/dist/client/env.mjs
+2026-02-28T17:26:30.783Z vite:import-analysis 1.09ms [1 imports rewritten] node_modules/vite/dist/client/client.mjs
+2026-02-28T17:26:30.783Z vite:transform 7.63ms /@vite/client
+2026-02-28T17:26:30.786Z vite:time 26.25ms /@vite/client
+2026-02-28T17:26:30.788Z vite:resolve 0.97ms ./App.tsx -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/App.tsx
+2026-02-28T17:26:30.788Z vite:resolve 1.03ms ./index.css -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/index.css
+2026-02-28T17:26:30.788Z vite:resolve 1.12ms react/jsx-dev-runtime -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18
+2026-02-28T17:26:30.788Z vite:resolve 1.12ms react -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/react.js?v=44544e18
+2026-02-28T17:26:30.789Z vite:resolve 1.13ms react-dom/client -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/react-dom_client.js?v=d2050c1d
+2026-02-28T17:26:30.789Z vite:import-analysis /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18 needs interop
+2026-02-28T17:26:30.790Z vite:import-analysis /node_modules/.vite/deps/react.js?v=44544e18 needs interop
+2026-02-28T17:26:30.790Z vite:import-analysis /node_modules/.vite/deps/react-dom_client.js?v=d2050c1d needs interop
+2026-02-28T17:26:30.791Z vite:import-analysis 3.34ms [5 imports rewritten] src/main.tsx
+2026-02-28T17:26:30.793Z vite:transform 263.03ms /src/main.tsx
+2026-02-28T17:26:30.794Z vite:time 32.43ms /src/main.tsx
+2026-02-28T17:26:30.795Z vite:load 4.38ms [fs] /src/index.css
+2026-02-28T17:26:30.797Z vite:load 14.28ms [fs] /node_modules/vite/dist/client/env.mjs
+2026-02-28T17:26:30.798Z vite:import-analysis 0.05ms [no imports] node_modules/vite/dist/client/env.mjs
+2026-02-28T17:26:30.798Z vite:transform 0.65ms /node_modules/vite/dist/client/env.mjs
+2026-02-28T17:26:30.798Z vite:load 7.79ms [fs] /src/App.tsx
+2026-02-28T17:26:30.815Z vite:cache [memory] /node_modules/vite/dist/client/env.mjs
+2026-02-28T17:26:30.815Z vite:time 0.58ms /node_modules/vite/dist/client/env.mjs
+2026-02-28T17:26:30.819Z vite:resolve 1.63ms ./components/AuthUI -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/components/AuthUI.tsx
+2026-02-28T17:26:30.819Z vite:resolve 1.76ms ./components/Dashboard -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/components/Dashboard.tsx
+2026-02-28T17:26:30.819Z vite:cache [memory] /@react-refresh
+2026-02-28T17:26:30.820Z vite:import-analysis /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18 needs interop
+2026-02-28T17:26:30.820Z vite:import-analysis /node_modules/.vite/deps/react.js?v=44544e18 needs interop
+2026-02-28T17:26:30.820Z vite:hmr [self-accepts] src/App.tsx
+2026-02-28T17:26:30.821Z vite:import-analysis 3.60ms [5 imports rewritten] src/App.tsx
+2026-02-28T17:26:30.822Z vite:transform 23.73ms /src/App.tsx
+2026-02-28T17:26:30.822Z vite:time 6.16ms /src/App.tsx
+2026-02-28T17:26:30.968Z vite:load 146.87ms [fs] /src/components/AuthUI.tsx
+2026-02-28T17:26:30.984Z vite:load 163.48ms [fs] /src/components/Dashboard.tsx
+2026-02-28T17:26:31.066Z vite:resolve 0.29ms /index.html -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/index.html
+2026-02-28T17:26:31.066Z vite:resolve 0.22ms /src/vite-env.d.ts -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/vite-env.d.ts
+2026-02-28T17:26:31.067Z vite:resolve 0.17ms /src/lib/supabase.ts -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/lib/supabase.ts
+2026-02-28T17:26:31.067Z vite:resolve 0.16ms /tailwind.config.js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/tailwind.config.js
+2026-02-28T17:26:31.067Z vite:hmr [self-accepts] src/index.css
+2026-02-28T17:26:31.067Z vite:import-analysis 0.28ms [0 imports rewritten] src/index.css
+2026-02-28T17:26:31.067Z vite:transform 272.33ms /src/index.css
+2026-02-28T17:26:31.067Z vite:time 250.76ms /src/index.css
+2026-02-28T17:26:31.069Z vite:resolve 1.13ms ../lib/supabase -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/src/lib/supabase.ts
+2026-02-28T17:26:31.069Z vite:cache [memory] /@react-refresh
+2026-02-28T17:26:31.069Z vite:resolve 1.21ms @supabase/auth-ui-react -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/@supabase_auth-ui-react.js?v=d47cfa81
+2026-02-28T17:26:31.070Z vite:resolve 1.22ms @supabase/auth-ui-shared -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/@supabase_auth-ui-shared.js?v=20fd1a0a
+2026-02-28T17:26:31.070Z vite:import-analysis /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18 needs interop
+2026-02-28T17:26:31.070Z vite:import-analysis /node_modules/.vite/deps/react.js?v=44544e18 needs interop
+2026-02-28T17:26:31.070Z vite:import-analysis /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18 needs interop
+2026-02-28T17:26:31.070Z vite:import-analysis /node_modules/.vite/deps/react.js?v=44544e18 needs interop
+2026-02-28T17:26:31.071Z vite:hmr [self-accepts] src/components/Dashboard.tsx
+2026-02-28T17:26:31.071Z vite:hmr [self-accepts] src/components/AuthUI.tsx
+2026-02-28T17:26:31.071Z vite:import-analysis 2.75ms [4 imports rewritten] src/components/Dashboard.tsx
+2026-02-28T17:26:31.071Z vite:import-analysis 2.83ms [6 imports rewritten] src/components/AuthUI.tsx
+2026-02-28T17:26:31.072Z vite:transform 87.67ms /src/components/Dashboard.tsx
+2026-02-28T17:26:31.073Z vite:transform 105.07ms /src/components/AuthUI.tsx
+2026-02-28T17:26:31.073Z vite:time 106.33ms /src/components/Dashboard.tsx
+2026-02-28T17:26:31.073Z vite:time 106.91ms /src/components/AuthUI.tsx
+2026-02-28T17:26:31.074Z vite:load 3.14ms [fs] /src/lib/supabase.ts
+2026-02-28T17:26:31.075Z vite:resolve 0.04ms @supabase/supabase-js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/@supabase_supabase-js.js?v=ee7c66dc
+2026-02-28T17:26:31.076Z vite:import-analysis 0.50ms [1 imports rewritten] src/lib/supabase.ts
+2026-02-28T17:26:31.076Z vite:transform 2.04ms /src/lib/supabase.ts
+2026-02-28T17:26:31.116Z vite:cache [memory] /src/lib/supabase.ts
+2026-02-28T17:26:31.116Z vite:time 0.53ms /src/lib/supabase.ts
+2026-02-28T17:26:31.132Z vite:deps Ô£¿ static imports crawl ended
+2026-02-28T17:26:31.133Z vite:deps Ô£¿ using post-scan optimizer result, the scanner found every used dependency
+2026-02-28T17:26:31.133Z vite:deps creating _metadata.json in C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps_temp_c9d66ceb
+2026-02-28T17:26:31.134Z vite:deps renaming C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps to C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps_temp_81ecdd30
+2026-02-28T17:26:31.135Z vite:deps renaming C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps_temp_c9d66ceb to C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps
+2026-02-28T17:26:31.136Z vite:deps removing cache temp dir C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps_temp_81ecdd30
+2026-02-28T17:26:31.137Z vite:optimize-deps load C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/react_jsx-dev-runtime.js
+2026-02-28T17:26:31.137Z vite:optimize-deps load C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/react.js
+2026-02-28T17:26:31.137Z vite:optimize-deps load C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/react-dom_client.js
+2026-02-28T17:26:31.137Z vite:optimize-deps load C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/@supabase_auth-ui-react.js
+2026-02-28T17:26:31.137Z vite:optimize-deps load C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/@supabase_auth-ui-shared.js
+2026-02-28T17:26:31.137Z vite:optimize-deps load C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/@supabase_supabase-js.js
+2026-02-28T17:26:31.137Z vite:deps Ô£¿ dependencies optimized
+2026-02-28T17:26:31.137Z vite:load 346.98ms [plugin] /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18
+2026-02-28T17:26:31.138Z vite:resolve 0.15ms ./chunk-CANBAPAS.js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/chunk-CANBAPAS.js?v=43f8ff29
+2026-02-28T17:26:31.138Z vite:resolve 0.21ms ./chunk-5WRI5ZAA.js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/chunk-5WRI5ZAA.js?v=43f8ff29
+2026-02-28T17:26:31.138Z vite:optimize-deps load C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/chunk-CANBAPAS.js
+2026-02-28T17:26:31.138Z vite:optimize-deps load C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/chunk-5WRI5ZAA.js
+2026-02-28T17:26:31.138Z vite:import-analysis 0.83ms [2 imports rewritten] node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18
+2026-02-28T17:26:31.138Z vite:transform 1.04ms /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18
+2026-02-28T17:26:31.139Z vite:time 324.85ms /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18
+2026-02-28T17:26:31.139Z vite:load 348.41ms [plugin] /node_modules/.vite/deps/react-dom_client.js?v=d2050c1d
+2026-02-28T17:26:31.139Z vite:resolve 0.09ms ./chunk-TYILIMWK.js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/chunk-TYILIMWK.js?v=43f8ff29
+2026-02-28T17:26:31.140Z vite:optimize-deps load C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/chunk-TYILIMWK.js
+2026-02-28T17:26:31.140Z vite:import-analysis 0.56ms [3 imports rewritten] node_modules/.vite/deps/react-dom_client.js?v=d2050c1d
+2026-02-28T17:26:31.140Z vite:transform 0.69ms /node_modules/.vite/deps/react-dom_client.js?v=d2050c1d
+2026-02-28T17:26:31.140Z vite:time 323.80ms /node_modules/.vite/deps/react-dom_client.js?v=d2050c1d
+2026-02-28T17:26:31.141Z vite:load 350.49ms [plugin] /node_modules/.vite/deps/react.js?v=44544e18
+2026-02-28T17:26:31.142Z vite:import-analysis 0.31ms [2 imports rewritten] node_modules/.vite/deps/react.js?v=44544e18
+2026-02-28T17:26:31.142Z vite:transform 0.48ms /node_modules/.vite/deps/react.js?v=44544e18
+2026-02-28T17:26:31.142Z vite:time 327.74ms /node_modules/.vite/deps/react.js?v=44544e18
+2026-02-28T17:26:31.142Z vite:load 71.04ms [plugin] /node_modules/.vite/deps/@supabase_auth-ui-shared.js?v=20fd1a0a
+2026-02-28T17:26:31.142Z vite:resolve 0.08ms ./chunk-2SSKUM6T.js -> C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/chunk-2SSKUM6T.js?v=43f8ff29
+2026-02-28T17:26:31.142Z vite:optimize-deps load C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite/deps/chunk-2SSKUM6T.js
+2026-02-28T17:26:31.143Z vite:import-analysis 0.41ms [2 imports rewritten] node_modules/.vite/deps/@supabase_auth-ui-shared.js?v=20fd1a0a
+2026-02-28T17:26:31.143Z vite:transform 0.56ms /node_modules/.vite/deps/@supabase_auth-ui-shared.js?v=20fd1a0a
+2026-02-28T17:26:31.143Z vite:time 25.84ms /node_modules/.vite/deps/@supabase_auth-ui-shared.js?v=20fd1a0a
+2026-02-28T17:26:31.143Z vite:load 72.08ms [plugin] /node_modules/.vite/deps/@supabase_auth-ui-react.js?v=d47cfa81
+2026-02-28T17:26:31.144Z vite:import-analysis 0.97ms [3 imports rewritten] node_modules/.vite/deps/@supabase_auth-ui-react.js?v=d47cfa81
+2026-02-28T17:26:31.144Z vite:transform 1.29ms /node_modules/.vite/deps/@supabase_auth-ui-react.js?v=d47cfa81
+2026-02-28T17:26:31.145Z vite:time 28.03ms /node_modules/.vite/deps/@supabase_auth-ui-react.js?v=d47cfa81
+2026-02-28T17:26:31.145Z vite:load 69.21ms [plugin] /node_modules/.vite/deps/@supabase_supabase-js.js?v=ee7c66dc
+2026-02-28T17:26:31.149Z vite:import-analysis 2.87ms [1 imports rewritten] node_modules/.vite/deps/@supabase_supabase-js.js?v=ee7c66dc
+2026-02-28T17:26:31.149Z vite:transform 3.71ms /node_modules/.vite/deps/@supabase_supabase-js.js?v=ee7c66dc
+2026-02-28T17:26:31.150Z vite:time 30.94ms /node_modules/.vite/deps/@supabase_supabase-js.js?v=ee7c66dc
+2026-02-28T17:26:31.156Z vite:load 18.06ms [plugin] /node_modules/.vite/deps/chunk-CANBAPAS.js?v=43f8ff29
+2026-02-28T17:26:31.158Z vite:import-analysis 1.06ms [1 imports rewritten] node_modules/.vite/deps/chunk-CANBAPAS.js?v=43f8ff29
+2026-02-28T17:26:31.158Z vite:transform 1.52ms /node_modules/.vite/deps/chunk-CANBAPAS.js?v=43f8ff29
+2026-02-28T17:26:31.158Z vite:time 5.19ms /node_modules/.vite/deps/chunk-CANBAPAS.js?v=43f8ff29
+2026-02-28T17:26:31.159Z vite:load 20.48ms [plugin] /node_modules/.vite/deps/chunk-5WRI5ZAA.js?v=43f8ff29
+2026-02-28T17:26:31.159Z vite:import-analysis 0.03ms [no imports] node_modules/.vite/deps/chunk-5WRI5ZAA.js?v=43f8ff29
+2026-02-28T17:26:31.159Z vite:transform 0.22ms /node_modules/.vite/deps/chunk-5WRI5ZAA.js?v=43f8ff29
+2026-02-28T17:26:31.159Z vite:time 5.90ms /node_modules/.vite/deps/chunk-5WRI5ZAA.js?v=43f8ff29
+2026-02-28T17:26:31.160Z vite:load 17.85ms [plugin] /node_modules/.vite/deps/chunk-2SSKUM6T.js?v=43f8ff29
+2026-02-28T17:26:31.161Z vite:import-analysis 0.09ms [no imports] node_modules/.vite/deps/chunk-2SSKUM6T.js?v=43f8ff29
+2026-02-28T17:26:31.161Z vite:transform 0.44ms /node_modules/.vite/deps/chunk-2SSKUM6T.js?v=43f8ff29
+2026-02-28T17:26:31.161Z vite:time 7.15ms /node_modules/.vite/deps/chunk-2SSKUM6T.js?v=43f8ff29
+2026-02-28T17:26:31.161Z vite:load 21.78ms [plugin] /node_modules/.vite/deps/chunk-TYILIMWK.js?v=43f8ff29
+2026-02-28T17:26:31.170Z vite:cache [memory] /node_modules/.vite/deps/chunk-CANBAPAS.js?v=43f8ff29
+2026-02-28T17:26:31.170Z vite:cache [memory] /node_modules/.vite/deps/chunk-5WRI5ZAA.js?v=43f8ff29
+2026-02-28T17:26:31.170Z vite:import-analysis 5.51ms [2 imports rewritten] node_modules/.vite/deps/chunk-TYILIMWK.js?v=43f8ff29
+2026-02-28T17:26:31.170Z vite:transform 8.41ms /node_modules/.vite/deps/chunk-TYILIMWK.js?v=43f8ff29
+2026-02-28T17:26:31.172Z vite:time 18.59ms /node_modules/.vite/deps/chunk-TYILIMWK.js?v=43f8ff29
+2026-02-28T17:26:31.245Z vite:time 0.78ms /favicon.ico
+2026-02-28T17:26:52.757Z vite:hmr [file change] vite_error.log
+2026-02-28T17:26:52.757Z vite:hmr [no modules matched] vite_error.log
+2026-02-28T17:27:05.976Z vite:html-fallback Rewriting GET / to /index.html
+2026-02-28T17:27:05.978Z vite:cache [memory] /src/main.tsx
+2026-02-28T17:27:05.979Z vite:time 2.98ms /index.html
+2026-02-28T17:27:06.150Z vite:cache [memory] /@vite/client
+2026-02-28T17:27:06.161Z vite:time 11.76ms /@vite/client
+2026-02-28T17:27:06.165Z vite:cache [memory] /src/main.tsx
+2026-02-28T17:27:06.166Z vite:time 2.46ms /src/main.tsx
+2026-02-28T17:27:06.167Z vite:cache [304] /@react-refresh
+2026-02-28T17:27:06.167Z vite:time 0.11ms /@react-refresh
+2026-02-28T17:27:06.169Z vite:cache [memory] /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18
+2026-02-28T17:27:06.170Z vite:time 0.41ms /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18
+2026-02-28T17:27:06.170Z vite:cache [memory] /node_modules/.vite/deps/react.js?v=44544e18
+2026-02-28T17:27:06.170Z vite:time 0.21ms /node_modules/.vite/deps/react.js?v=44544e18
+2026-02-28T17:27:06.171Z vite:cache [304] /node_modules/vite/dist/client/env.mjs
+2026-02-28T17:27:06.171Z vite:time 0.09ms /node_modules/vite/dist/client/env.mjs
+2026-02-28T17:27:06.171Z vite:cache [memory] /node_modules/.vite/deps/react-dom_client.js?v=d2050c1d
+2026-02-28T17:27:06.172Z vite:time 0.21ms /node_modules/.vite/deps/react-dom_client.js?v=d2050c1d
+2026-02-28T17:27:06.172Z vite:cache [memory] /src/index.css
+2026-02-28T17:27:06.172Z vite:time 0.20ms /src/index.css
+2026-02-28T17:27:06.173Z vite:cache [memory] /src/App.tsx
+2026-02-28T17:27:06.173Z vite:time 0.20ms /src/App.tsx
+2026-02-28T17:27:06.191Z vite:cache [memory] /node_modules/.vite/deps/chunk-CANBAPAS.js?v=43f8ff29
+2026-02-28T17:27:06.191Z vite:time 0.63ms /node_modules/.vite/deps/chunk-CANBAPAS.js?v=43f8ff29
+2026-02-28T17:27:06.192Z vite:cache [memory] /node_modules/.vite/deps/chunk-5WRI5ZAA.js?v=43f8ff29
+2026-02-28T17:27:06.192Z vite:time 0.31ms /node_modules/.vite/deps/chunk-5WRI5ZAA.js?v=43f8ff29
+2026-02-28T17:27:06.193Z vite:cache [memory] /node_modules/.vite/deps/chunk-TYILIMWK.js?v=43f8ff29
+2026-02-28T17:27:06.194Z vite:time 0.99ms /node_modules/.vite/deps/chunk-TYILIMWK.js?v=43f8ff29
+2026-02-28T17:27:06.197Z vite:cache [memory] /src/components/AuthUI.tsx
+2026-02-28T17:27:06.197Z vite:time 0.43ms /src/components/AuthUI.tsx
+2026-02-28T17:27:06.198Z vite:cache [memory] /src/components/Dashboard.tsx
+2026-02-28T17:27:06.198Z vite:time 0.27ms /src/components/Dashboard.tsx
+2026-02-28T17:27:06.211Z vite:cache [memory] /src/lib/supabase.ts
+2026-02-28T17:27:06.211Z vite:time 0.39ms /src/lib/supabase.ts
+2026-02-28T17:27:06.212Z vite:cache [memory] /node_modules/.vite/deps/@supabase_auth-ui-react.js?v=d47cfa81
+2026-02-28T17:27:06.212Z vite:time 0.24ms /node_modules/.vite/deps/@supabase_auth-ui-react.js?v=d47cfa81
+2026-02-28T17:27:06.212Z vite:cache [memory] /node_modules/.vite/deps/@supabase_auth-ui-shared.js?v=20fd1a0a
+2026-02-28T17:27:06.212Z vite:time 0.13ms /node_modules/.vite/deps/@supabase_auth-ui-shared.js?v=20fd1a0a
+2026-02-28T17:27:06.223Z vite:cache [memory] /node_modules/.vite/deps/@supabase_supabase-js.js?v=ee7c66dc
+2026-02-28T17:27:06.224Z vite:time 0.48ms /node_modules/.vite/deps/@supabase_supabase-js.js?v=ee7c66dc
+2026-02-28T17:27:06.225Z vite:cache [memory] /node_modules/.vite/deps/chunk-2SSKUM6T.js?v=43f8ff29
+2026-02-28T17:27:06.225Z vite:time 0.15ms /node_modules/.vite/deps/chunk-2SSKUM6T.js?v=43f8ff29
+2026-02-28T17:27:06.324Z vite:time 0.43ms /favicon.ico
+2026-02-28T17:27:19.625Z vite:hmr [file change] vite_error.log
+2026-02-28T17:27:19.625Z vite:hmr [no modules matched] vite_error.log
+2026-02-28T17:30:47.111Z vite:hmr [file change] src/components/AuthUI.tsx
+[2m2:30:47 p.┬ám.[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/AuthUI.tsx, /src/index.css[22m
+2026-02-28T17:30:47.128Z vite:load 0.75ms [fs] /src/components/AuthUI.tsx
+2026-02-28T17:30:47.142Z vite:load 14.01ms [fs] /src/index.css
+2026-02-28T17:30:47.149Z vite:cache [memory] /@react-refresh
+2026-02-28T17:30:47.149Z vite:cache [memory] /src/lib/supabase.ts
+2026-02-28T17:30:47.149Z vite:import-analysis /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18 needs interop
+2026-02-28T17:30:47.149Z vite:import-analysis /node_modules/.vite/deps/react.js?v=44544e18 needs interop
+2026-02-28T17:30:47.149Z vite:cache [memory] /node_modules/.vite/deps/react_jsx-dev-runtime.js?v=44544e18
+2026-02-28T17:30:47.149Z vite:cache [memory] /node_modules/.vite/deps/react.js?v=44544e18
+2026-02-28T17:30:47.149Z vite:cache [memory] /node_modules/.vite/deps/@supabase_auth-ui-react.js?v=d47cfa81
+2026-02-28T17:30:47.149Z vite:cache [memory] /node_modules/.vite/deps/@supabase_auth-ui-shared.js?v=20fd1a0a
+2026-02-28T17:30:47.149Z vite:hmr [self-accepts] src/components/AuthUI.tsx
+2026-02-28T17:30:47.150Z vite:import-analysis 1.53ms [6 imports rewritten] src/components/AuthUI.tsx
+2026-02-28T17:30:47.151Z vite:transform 22.59ms /src/components/AuthUI.tsx
+2026-02-28T17:30:47.151Z vite:time 24.20ms /src/components/AuthUI.tsx
+2026-02-28T17:30:47.184Z vite:hmr [self-accepts] src/index.css
+2026-02-28T17:30:47.184Z vite:import-analysis 0.23ms [0 imports rewritten] src/index.css
+2026-02-28T17:30:47.185Z vite:transform 42.74ms /src/index.css
+2026-02-28T17:30:47.185Z vite:time 57.24ms /src/index.css
+2026-02-28T17:30:49.135Z vite:hmr [file change] vite_error.log
+2026-02-28T17:30:49.136Z vite:hmr [no modules matched] vite_error.log
+2026-02-28T17:32:37.512Z vite:hmr [config change] .env
+[2m2:32:37 p.┬ám.[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+2026-02-28T17:32:37.520Z vite:hmr [file change] vite_error.log
+2026-02-28T17:32:37.520Z vite:hmr [no modules matched] vite_error.log
+2026-02-28T17:32:37.532Z vite:hmr [file change] vite.config.js.timestamp-1772299957528-44c57b220ecea.mjs
+2026-02-28T17:32:37.532Z vite:hmr [no modules matched] vite.config.js.timestamp-1772299957528-44c57b220ecea.mjs
+2026-02-28T17:32:37.534Z vite:hmr [file change] vite.config.js.timestamp-1772299957530-543e8e50cab37.mjs
+2026-02-28T17:32:37.534Z vite:hmr [no modules matched] vite.config.js.timestamp-1772299957530-543e8e50cab37.mjs
+2026-02-28T17:32:37.536Z vite:config bundled config file loaded in 23.29ms
+2026-02-28T17:32:37.544Z vite:config using resolved config: {
+  plugins: [
+    'vite:optimized-deps',
+    'vite:watch-package-data',
+    'vite:pre-alias',
+    'alias',
+    'vite:react-babel',
+    'vite:react-refresh',
+    'vite:modulepreload-polyfill',
+    'vite:resolve',
+    'vite:html-inline-proxy',
+    'vite:css',
+    'vite:esbuild',
+    'vite:json',
+    'vite:wasm-helper',
+    'vite:worker',
+    'vite:asset',
+    'vite:wasm-fallback',
+    'vite:define',
+    'vite:css-post',
+    'vite:worker-import-meta-url',
+    'vite:asset-import-meta-url',
+    'vite:dynamic-import-vars',
+    'vite:import-glob',
+    'vite:client-inject',
+    'vite:css-analysis',
+    'vite:import-analysis'
+  ],
+  optimizeDeps: {
+    holdUntilCrawlEnd: true,
+    force: undefined,
+    esbuildOptions: { preserveSymlinks: false, jsx: 'automatic' },
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-dev-runtime',
+      'react/jsx-runtime'
+    ]
+  },
+  server: {
+    preTransformRequests: true,
+    host: undefined,
+    sourcemapIgnoreList: [Function: isInNodeModules$1],
+    middlewareMode: false,
+    fs: {
+      strict: true,
+      allow: [Array],
+      deny: [Array],
+      cachedChecks: undefined
+    }
+  },
+  esbuild: { jsxDev: true, jsx: 'automatic', jsxImportSource: undefined },
+  build: {
+    target: [ 'es2020', 'edge88', 'firefox78', 'chrome87', 'safari14' ],
+    cssTarget: [ 'es2020', 'edge88', 'firefox78', 'chrome87', 'safari14' ],
+    outDir: 'dist',
+    assetsDir: 'assets',
+    assetsInlineLimit: 4096,
+    cssCodeSplit: true,
+    sourcemap: false,
+    rollupOptions: { onwarn: [Function: onwarn] },
+    minify: 'esbuild',
+    terserOptions: {},
+    write: true,
+    emptyOutDir: null,
+    copyPublicDir: true,
+    manifest: false,
+    lib: false,
+    ssr: false,
+    ssrManifest: false,
+    ssrEmitAssets: false,
+    reportCompressedSize: true,
+    chunkSizeWarningLimit: 500,
+    watch: null,
+    commonjsOptions: { include: [Array], extensions: [Array] },
+    dynamicImportVarsOptions: { warnOnError: true, exclude: [Array] },
+    modulePreload: { polyfill: true },
+    cssMinify: true
+  },
+  resolve: {
+    mainFields: [ 'browser', 'module', 'jsnext:main', 'jsnext' ],
+    conditions: [],
+    extensions: [
+      '.mjs',  '.js',
+      '.mts',  '.ts',
+      '.jsx',  '.tsx',
+      '.json'
+    ],
+    dedupe: [ 'react', 'react-dom' ],
+    preserveSymlinks: false,
+    alias: [ [Object], [Object] ]
+  },
+  configFile: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/vite.config.js',
+  configFileDependencies: [
+    'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/vite.config.js'
+  ],
+  inlineConfig: {
+    root: undefined,
+    base: undefined,
+    mode: undefined,
+    configFile: undefined,
+    logLevel: undefined,
+    clearScreen: undefined,
+    optimizeDeps: { force: undefined },
+    server: { host: undefined }
+  },
+  root: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app',
+  base: '/',
+  decodedBase: '/',
+  rawBase: '/',
+  publicDir: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/public',
+  cacheDir: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app/node_modules/.vite',
+  command: 'serve',
+  mode: 'development',
+  ssr: {
+    target: 'node',
+    optimizeDeps: { noDiscovery: true, esbuildOptions: [Object] }
+  },
+  isWorker: false,
+  mainConfig: null,
+  bundleChain: [],
+  isProduction: false,
+  css: { lightningcss: undefined },
+  preview: {
+    port: undefined,
+    strictPort: undefined,
+    host: undefined,
+    allowedHosts: undefined,
+    https: undefined,
+    open: undefined,
+    proxy: undefined,
+    cors: undefined,
+    headers: undefined
+  },
+  envDir: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app',
+  env: {
+    VITE_SUPABASE_URL: 'https://ejekklaxazkxkbrzcbek.supabase.co',
+    VITE_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqZWtrbGF4YXpreGticnpjYmVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyOTIzODgsImV4cCI6MjA4Nzg2ODM4OH0.kOlnMuHmbKo5PirmvlIhdhanE9z8LOCRqXxyOSCdEFU',
+    BASE_URL: '/',
+    MODE: 'development',
+    DEV: true,
+    PROD: false
+  },
+  assetsInclude: [Function: assetsInclude],
+  logger: {
+    hasWarned: false,
+    info: [Function: info],
+    warn: [Function: warn],
+    warnOnce: [Function: warnOnce],
+    error: [Function: error],
+    clearScreen: [Function: clearScreen],
+    hasErrorLogged: [Function: hasErrorLogged]
+  },
+  packageCache: Map(1) {
+    'fnpd_C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app' => {
+      dir: 'C:/Users/pc/.gemini/antigravity/scratch/cycling-dashboard-app',
+      data: [Object],
+      hasSideEffects: [Function: hasSideEffects],
+      webResolvedImports: {},
+      nodeResolvedImports: {},
+      setResolvedCache: [Function: setResolvedCache],
+      getResolvedCache: [Function: getResolvedCache]
+    },
+    set: [Function (anonymous)]
+  },
+  createResolver: [Function: createResolver],
+  worker: { format: 'iife', plugins: '() => plugins', rollupOptions: {} },
+  appType: 'spa',
+  experimental: { importGlobRestoreExtension: false, hmrPartialAccept: false },
+  webSocketToken: 'hMWvG555Sy2Y',
+  additionalAllowedHosts: [],
+  getSortedPlugins: [Function: getSortedPlugins],
+  getSortedPluginHooks: [Function: getSortedPluginHooks]
+}
+2026-02-28T17:32:37.558Z vite:deps Hash is consistent. Skipping. Use --force to override.
+[2m2:32:37 p.┬ám.[22m [36m[1m[vite][22m[39m server restarted.
+2026-02-28T17:32:37.572Z vite:hmr [file change] vite_error.log
+2026-02-28T17:32:37.572Z vite:hmr [no modules matched] vite_error.log

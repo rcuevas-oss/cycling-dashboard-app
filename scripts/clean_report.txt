@@ -1,0 +1,7 @@
+Escribiendo archivo limpio...
+=== REPORTE_START ===
+cleaned_comma_cols: []
+decimal_cols: ['Temperatura máxima', 'TE aeróbico', 'Distancia', 'Temperatura mínima', 'Velocidad máxima', 'Velocidad media', 'Training Stress Score®']
+integer_cols: ['Ritmo respiratorio medio', 'Potencia media máxima (20 minutos)', 'Altura mínima', 'FC máxima', 'Potencia media', 'Ritmo máximo de respiración', 'Normalized Power® (NP®)', 'Ritmo mínimo de respiración', 'Ascenso total', 'Frecuencia cardiaca media', 'Calorías', 'Cadencia media de pedaleo', 'Cadencia de pedaleo máxima', 'Pedaladas totales', 'Número de vueltas', 'Altura máxima', 'Descenso total', 'Potencia máxima']
+nulls_generated: 45
+=== REPORTE_END ===

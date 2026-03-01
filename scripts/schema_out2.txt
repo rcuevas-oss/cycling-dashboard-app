@@ -1,0 +1,3 @@
+Table is empty, fetching schema via REST...
+REST response: []
+Columns in activities table: id, user_id, file_name, activity_date, duration_minutes, distance_km, avg_power, normalized_power, avg_hr, tss, created_at, ascenso_total, descenso_total, temperatura_min, temperatura_max, numero_vueltas, despues_vueltas, tiempo_movimiento, tiempo_transcurrido, descompresion, altura_max, altura_min, mejor_vuelta, resp_media, resp_min, resp_max, velocidad_maxima, tiempo, calorias, fc_media, fc_maxima, te_aerobico, velocidad_media, cadencia_media, cadencia_maxima, training_stress_score, potencia_20min, potencia_media, potencia_maxima, pedaladas_totales

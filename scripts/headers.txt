@@ -1,0 +1,34 @@
+0: Tipo de actividad
+1: Fecha
+2: Favorito
+3: Título
+4: Distancia
+5: Calorías
+6: Tiempo
+7: Frecuencia cardiaca media
+8: FC máxima
+9: TE aeróbico
+10: Velocidad media
+11: Velocidad máxima
+12: Ascenso total
+13: Descenso total
+14: Cadencia media de pedaleo
+15: Cadencia de pedaleo máxima
+16: Normalized Power® (NP®)
+17: Training Stress Score®
+18: Potencia media máxima (20 minutos)
+19: Potencia media
+20: Potencia máxima
+21: Pedaladas totales
+22: Temperatura mínima
+23: Descompresión
+24: Mejor tiempo de vuelta
+25: Número de vueltas
+26: Temperatura máxima
+27: Ritmo respiratorio medio
+28: Ritmo mínimo de respiración
+29: Ritmo máximo de respiración
+30: Tiempo en movimiento
+31: Tiempo transcurrido
+32: Altura mínima
+33: Altura máxima
