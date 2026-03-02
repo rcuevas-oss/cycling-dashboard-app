@@ -12,7 +12,7 @@ export function Dashboard({ session }: { session: Session }) {
         const { data, error } = await supabase
             .from('activities')
             .select('*')
-            .order('created_at', { ascending: false });
+            .order('activity_date', { ascending: false });
 
         if (!error && data) {
             setActivities(data);
@@ -43,8 +43,6 @@ export function Dashboard({ session }: { session: Session }) {
 
                     const activitiesToInsert = [];
 
-                    // Función auxiliar paso-crudo (Raw pass-through). 
-                    // No convierte a Number en JS para evitar que JS modifique el decimal Garmin original.
                     const tNum = (val: string, _isInt = false) => {
                         if (!val || val === '--' || val === '') return null;
 
@@ -52,15 +50,26 @@ export function Dashboard({ session }: { session: Session }) {
                         let cleaned = val.replace(/^"|"$/g, '').trim();
                         if (cleaned === '') return null;
 
-                        // Si el usuario quiere que la coma española pase limpia a la BD, no hacemos floats
-                        // Retornamos el string puro, postgres se encargará de hacer el CAST a su columna Number/Interval
-                        return cleaned;
-                    }
+                        // Regla maestra de limpieza numérica pro (Soporta formatos USA y EU)
+                        if (cleaned.includes(',') && cleaned.includes('.')) {
+                            if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
+                                cleaned = cleaned.replace(/,/g, ''); // USA: 1,234.56 -> 1234.56
+                            } else {
+                                cleaned = cleaned.replace(/\./g, '').replace(',', '.'); // EU: 1.234,56 -> 1234.56
+                            }
+                        } else if (cleaned.includes(',')) {
+                            // Tiene coma pero no punto. Garmin exporta miles como "1,244". 
+                            // Si tiene 3 dígitos tras la coma, asumimos que es separador de miles.
+                            if (/,\d{3}$/.test(cleaned) && cleaned.length >= 5) {
+                                cleaned = cleaned.replace(/,/g, ''); // 1,244 -> 1244
+                            } else {
+                                cleaned = cleaned.replace(',', '.'); // 15,5 -> 15.5
+                            }
+                        }
 
-                    const tInterval = (val: string) => {
-                        if (!val || val === '--' || val === '') return null;
-                        // Los tiempos como '00:55:04' son directamente compatibles con Postgres interval
-                        return val;
+                        // Parsear explícitamente a Número de Javascript antes de enviarlo a PostgreSQL
+                        const num = Number(cleaned);
+                        return isNaN(num) ? null : num;
                     }
 
                     // Iterar por todas las líneas saltando la cabecera
@@ -76,7 +85,21 @@ export function Dashboard({ session }: { session: Session }) {
 
                         let fecha = null;
                         if (dataTokens[1]) {
-                            const parseDate = new Date(dataTokens[1]); // ej. "2026-02-20 11:35:11"
+                            // Garmin Chile suele devolver "DD-MM-YYYY HH:mm:ss" pero a veces "YYYY-MM-DD HH:mm:ss"
+                            let dateStr = dataTokens[1].replace(/"/g, '').trim();
+
+                            // Si detecta DD-MM-YYYY o DD/MM/YYYY, lo invierte a YYYY-MM-DD para compatibilidad absoluta de JS
+                            const isDDMMYYYY = /^(\d{2})[-/](\d{2})[-/](\d{4})/.test(dateStr);
+                            if (isDDMMYYYY) {
+                                dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$3-$2-$1');
+                            }
+
+                            // Sustituir el espacio entre fecha y hora por una T para asegurar la sintaxis ISO en todos los navegadores
+                            dateStr = dateStr.replace(' ', 'T');
+
+                            const parseDate = new Date(dateStr);
+
+                            // Si logró parsearlo adecuadamente
                             if (!isNaN(parseDate.getTime())) {
                                 fecha = parseDate.toISOString();
                             }
@@ -188,31 +211,20 @@ export function Dashboard({ session }: { session: Session }) {
                 throw new Error("No se encontraron entrenamientos legibles en el CSV. Intenta resubir.");
             }
 
-            setMessage(`Respaldando ${file.name} en Supabase Storage...`);
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${session.user.id}/${Math.random()}.${fileExt}`;
+            // Usamos Upsert delegando el filtro de duplicados a PostgreSQL
+            // La base de datos ignorará silenciosamente si las 3 claves coinciden
+            setMessage(`Inyectando hasta ${parsedActivities.length} entrenamientos limpios en tu Base de Datos...`);
 
-            const { error: uploadError } = await supabase.storage
-                .from('activities')
-                .upload(fileName, file);
-
-            if (uploadError) throw uploadError;
-
-            setMessage(`Inyectando ${parsedActivities.length} entrenamientos limpios en tu Base de Datos...`);
-
-            // Adjuntamos el user_id para asegurar que queden a nombre del usuario activo
             let insertPayload = parsedActivities.map(act => ({
                 user_id: session.user.id,
                 ...act
             }));
 
-            // Inserción masiva en Supabase sin Auto-Sanado para forzar que falle e imprima la causa
-            console.log("PAYLOAD a Insertar:", insertPayload[0]);
-
             const { error: dbError } = await supabase
                 .from('activities')
                 .upsert(insertPayload, {
-                    onConflict: 'user_id, activity_date, distance_km' // Clave combinada Nivel SaaS para Doble Turno
+                    onConflict: 'user_id, activity_date, distance_km',
+                    ignoreDuplicates: true // Clave vital: ignora duplicados en lugar de dar error o sobreescribir
                 });
 
             if (dbError) {
@@ -220,7 +232,7 @@ export function Dashboard({ session }: { session: Session }) {
                 throw new Error('Error guardando en la tabla: ' + dbError.message + " - Detalles en consola.");
             }
 
-            setMessage(`✅ ¡Exito! Se sincronizaron perfectamente ${parsedActivities.length} actividades.`);
+            setMessage(`✅ ¡Exito! Sincronización completa finalizada.`);
             setFile(null);
             fetchActivities();
         } catch (error: any) {
@@ -307,14 +319,22 @@ export function Dashboard({ session }: { session: Session }) {
                                 <p className="text-zinc-500 text-sm mt-2 max-w-sm">Sube tu primer archivo de Garmin en el panel lateral para empezar a visualizar tus métricas.</p>
                             </div>
                         ) : (
-                            <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar" style={{ maxHeight: "calc(100vh - 200px)" }}>
+                            <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar min-h-[400px]">
                                 {activities.map((act) => (
                                     <div key={act.id} className="p-5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
                                         <div className="flex-1 min-w-0">
                                             <p className="font-semibold text-garmin-blue text-lg truncate" title={act.file_name || act.titulo || 'Entrenamiento Garmin'}>
                                                 {act.file_name || act.titulo || 'Entrenamiento Garmin'}
                                             </p>
-                                            <p className="text-sm text-zinc-400 mt-1">{act.activity_date ? new Date(act.activity_date).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' }) : 'Fecha Desconocida'}</p>
+                                            <p className="text-sm text-zinc-400 mt-1">
+                                                {act.activity_date
+                                                    ? new Date(act.activity_date).toLocaleString('es-CL', {
+                                                        timeZone: 'America/Santiago',
+                                                        dateStyle: 'long',
+                                                        timeStyle: 'short'
+                                                    })
+                                                    : 'Fecha Desconocida'}
+                                            </p>
                                         </div>
                                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm w-full md:w-auto bg-zinc-900/50 p-3 rounded-lg border border-zinc-700/30">
                                             <div className="flex flex-col">

@@ -1,0 +1,31 @@
+WORKOUT FIELDS MAP:
+4: sport
+5: capabilities
+6: numValidSteps
+8: wktName
+11: subSport
+14: poolLength
+15: poolLengthUnit
+17: wktDescription
+254: messageIndex
+
+WORKOUT STEP FIELDS MAP:
+0: wktStepName
+1: durationType
+2: durationValue
+3: targetType
+4: targetValue
+5: customTargetValueLow
+6: customTargetValueHigh
+7: intensity
+8: notes
+9: equipment
+10: exerciseCategory
+11: exerciseName
+12: exerciseWeight
+13: weightDisplayUnit
+19: secondaryTargetType
+20: secondaryTargetValue
+21: secondaryCustomTargetValueLow
+22: secondaryCustomTargetValueHigh
+254: messageIndex

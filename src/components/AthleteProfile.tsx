@@ -11,6 +11,7 @@ export function AthleteProfile({ session }: { session: Session }) {
     const [nombre, setNombre] = useState('');
     const [sexo, setSexo] = useState('Masculino');
     const [disciplina, setDisciplina] = useState('Ruta');
+    const [objetivo, setObjetivo] = useState('Ninguno Específico');
     const [ftpActual, setFtpActual] = useState<number | ''>('');
     const [pesoActual, setPesoActual] = useState<number | ''>('');
 
@@ -39,6 +40,7 @@ export function AthleteProfile({ session }: { session: Session }) {
                 setNombre(data.nombre || '');
                 setSexo(data.sexo || 'Masculino');
                 setDisciplina(data.disciplina || 'Ruta');
+                setObjetivo(data.objetivo || 'Ninguno Específico');
                 setFtpActual(data.ftp_actual || '');
                 setPesoActual(data.peso_actual_kg || '');
                 setOriginalPeso(data.peso_actual_kg || '');
@@ -62,6 +64,7 @@ export function AthleteProfile({ session }: { session: Session }) {
                 nombre,
                 sexo,
                 disciplina,
+                objetivo,
                 ftp_actual: ftpActual === '' ? null : Number(ftpActual),
                 peso_actual_kg: pesoActual === '' ? null : Number(pesoActual),
                 updated_at: new Date().toISOString(),
@@ -141,6 +144,18 @@ export function AthleteProfile({ session }: { session: Session }) {
                                 <option value="MTB">MTB</option>
                                 <option value="Gravel">Gravel</option>
                                 <option value="Pista">Pista</option>
+                            </select>
+                        </div>
+                        <div className="flex flex-col gap-2 col-span-2">
+                            <label className="text-sm font-medium text-zinc-300">Objetivo Principal / Especialidad</label>
+                            <select value={objetivo} onChange={e => setObjetivo(e.target.value)}
+                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:outline-none focus:border-garmin-blue transition-colors"
+                            >
+                                <option value="Ninguno Específico">Ninguno Específico (Entrenamiento General)</option>
+                                <option value="Escalador / Subidas">Escalador / Subidas (Mejorar W/kg en Puertos)</option>
+                                <option value="Sprint / Explosividad">Sprint / Explosividad (Potencia Max / Pista)</option>
+                                <option value="Contrarreloj / Rodador">Contrarreloj / Rodador (Potencia Sostenida en Plano)</option>
+                                <option value="Gran Fondo / Resistencia">Gran Fondo / Ultra (Resistencia Extrema)</option>
                             </select>
                         </div>
                     </div>

@@ -1,0 +1,8 @@
+FILE_ID FIELDS MAP:
+0: type
+1: manufacturer
+2: product
+3: serialNumber
+4: timeCreated
+5: number
+8: productName
