@@ -4,6 +4,7 @@ import { Dashboard } from './components/Dashboard'
 import { AthleteProfile } from './components/AthleteProfile'
 import { TrainingPlanner } from './components/TrainingPlanner'
 import { AICoachModal } from './components/AICoachModal'
+import { LandingPage } from './components/LandingPage'
 import { Bot } from 'lucide-react'
 import { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
@@ -13,6 +14,7 @@ export default function App() {
     const [session, setSession] = useState<Session | null>(null)
     const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'planner'>('dashboard')
     const [isAIModalOpen, setIsAIModalOpen] = useState(false)
+    const [showAuth, setShowAuth] = useState(false)
 
     // Estado global del planificador para que la IA pueda inyectar rutinas
     const [schedule, setSchedule] = useState<Record<string, TrainingBlock[]>>({
@@ -20,22 +22,32 @@ export default function App() {
     })
 
     return (
-        <div className="min-h-screen bg-background text-zinc-100 flex items-center justify-center p-4 sm:p-8 overflow-hidden relative">
+        <div className="min-h-screen bg-background text-zinc-100 flex items-center justify-center overflow-hidden relative">
             {!session ? (
-                <div className="max-w-md w-full glass rounded-3xl p-8 premium-shadow text-center space-y-6">
-                    <div className="w-16 h-16 bg-garmin-blue/20 text-garmin-blue rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 3.5 0 0 0 0 7h5a3.5 3.5 3.5 0 0 1 0 7H6" /></svg>
+                !showAuth ? (
+                    <LandingPage onGetStarted={() => setShowAuth(true)} />
+                ) : (
+                    <div className="max-w-md w-full glass rounded-3xl p-8 premium-shadow text-center space-y-6 m-4 sm:m-8 animate-fade-in-up">
+                        <button
+                            onClick={() => setShowAuth(false)}
+                            className="absolute top-4 left-4 text-zinc-400 hover:text-white transition-colors text-sm flex items-center gap-1"
+                        >
+                            ← Volver
+                        </button>
+                        <div className="w-16 h-16 bg-garmin-blue/20 text-garmin-blue rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 3.5 0 0 0 0 7h5a3.5 3.5 3.5 0 0 1 0 7H6" /></svg>
+                        </div>
+                        <h1 className="text-3xl font-bold tracking-tight">
+                            Cycling <span className="gradient-text">AI Trainer</span>
+                        </h1>
+                        <p className="text-zinc-400">
+                            Inicia sesión para continuar.
+                        </p>
+                        <AuthUI onSessionChange={(s) => setSession(s)} />
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight">
-                        Cycling <span className="gradient-text">AI Trainer</span>
-                    </h1>
-                    <p className="text-zinc-400">
-                        Sube tus archivos CSV de Garmin y deja que nuestra inteligencia artificial optimice tus rutinas de entrenamiento basado en datos reales.
-                    </p>
-                    <AuthUI onSessionChange={(s) => setSession(s)} />
-                </div>
+                )
             ) : (
-                <div className="w-full max-w-[1400px] glass rounded-3xl p-4 sm:p-8 premium-shadow transition-all duration-500 min-h-[90vh] flex flex-col">
+                <div className="w-full max-w-[1400px] glass rounded-3xl p-4 sm:p-8 premium-shadow transition-all duration-500 min-h-[90vh] flex flex-col m-4 sm:m-8">
 
                     {/* APP HEADER & TABS UNIFICADO */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-border pb-6">

@@ -30,3 +30,7 @@ Toda la arquitectura Backend está sellada a través de **Políticas de Segurida
 
 ## 🚀 Próximas Fases: El Motor de IA
 La base de datos actual está preparada para la inserción del **Motor de Machine Learning / IA Generativa**. La IA tomará como contexto principal la cronología del desgaste (Training Stress Score) unida al histórico del peso y FTP, buscando generar calendarios automatizados predictivos que le digan al ciclista cuándo forzar el paso y cuándo recuperar para evitar el sobre-entrenamiento.
+
+## 🖥️ Interfaz de Usuario
+Actualmente, la aplicación está enfocada en la funcionalidad central o "Core Backend". **No cuenta con una Landing Page pública**.
+El enrutamiento inicia directamente en el sistema de autenticación, dando paso inmediato al panel de control (`Dashboard`), el planificador (`TrainingPlanner`) y el perfil del atleta una vez que se inicia sesión.
