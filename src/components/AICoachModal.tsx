@@ -12,6 +12,8 @@ interface AICoachModalProps {
     onClose: () => void;
     onApplyPlan?: (plan: Record<string, TrainingBlock[]>) => void;
     session: Session;
+    athleteProfile?: any;
+    recentActivitiesData?: any[];
 }
 
 interface ChatMessage {
@@ -23,10 +25,8 @@ interface ChatMessage {
     isGreeting?: boolean;
 }
 
-export function AICoachModal({ isOpen, onClose, onApplyPlan, session }: AICoachModalProps) {
+export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athleteProfile, recentActivitiesData }: AICoachModalProps) {
     const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
-    const [athleteProfile, setAthleteProfile] = useState<any>(null);
-    const [recentActivitiesData, setRecentActivitiesData] = useState<any[]>([]);
     const [showKeyInput, setShowKeyInput] = useState(false);
     const [inputMsg, setInputMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -37,45 +37,11 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session }: AICoachM
 
     useEffect(() => {
         if (isOpen) {
-            fetchAthleteData();
-            fetchRecentActivities();
             if (!apiKey && messages.length === 0) {
                 setShowKeyInput(true);
             }
         }
     }, [isOpen]);
-
-    const fetchAthleteData = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('athlete_profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-
-            if (data && !error) {
-                setAthleteProfile(data);
-            }
-        } catch (e) {
-            console.error("No se pudo cargar el perfil del atleta", e);
-        }
-    };
-
-    const fetchRecentActivities = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('activities')
-                .select('activity_date, distance_km, duration_minutes, training_stress_score, fc_media, normalized_power, potencia_media, potencia_maxima, ascenso_total')
-                .order('activity_date', { ascending: false })
-                .limit(10);
-
-            if (data && !error) {
-                setRecentActivitiesData(data);
-            }
-        } catch (e) {
-            console.error("No se pudieron cargar actividades recientes", e);
-        }
-    };
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -83,7 +49,7 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session }: AICoachM
 
     // EFECTO PROACTIVO: Auto-Diagnóstico de Bienvenida (V2)
     useEffect(() => {
-        if (isOpen && apiKey && messages.length === 0 && !hasSentWelcome && athleteProfile && recentActivitiesData.length > 0) {
+        if (isOpen && apiKey && messages.length === 0 && !hasSentWelcome && athleteProfile && (recentActivitiesData?.length ?? 0) > 0) {
             setHasSentWelcome(true);
             // Mandamos una orden oculta simulando que el usuario pidió analizar su forma
             handleSend("Analiza mi estado de forma actual y dame un diagnóstico basado en la carga reciente.", true);
@@ -120,6 +86,7 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session }: AICoachM
             const pesoGuardado = athleteProfile?.peso_actual_kg || "No especificado";
             const disciplinaGuardada = athleteProfile?.disciplina || "Ciclismo General";
             const objetivoGuardado = athleteProfile?.objetivo || "Ninguno Específico";
+            const nombreGuardado = athleteProfile?.nombre || session?.user?.user_metadata?.full_name || "Ciclista";
 
             // Cálculo crucial PRO: Vatios por Kilo (W/kg)
             let vatios_por_kilo: string | number = "No calculable";
@@ -128,6 +95,7 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session }: AICoachM
             }
 
             const athleteContext = {
+                nombre: nombreGuardado,
                 ftp: ftpGuardado,
                 peso_kg: pesoGuardado,
                 relacion_wkg: vatios_por_kilo,
@@ -141,7 +109,7 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session }: AICoachM
             let tss42d = 0;
             let mins7d = 0;
 
-            const recentActivities = recentActivitiesData.map(act => {
+            const recentActivities = (recentActivitiesData || []).map(act => {
                 if (act.activity_date) {
                     const diffTime = Math.abs(hoy.getTime() - new Date(act.activity_date).getTime());
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -294,17 +262,31 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session }: AICoachM
                 {/* Input API Key (Si es necesario) */}
                 {
                     showKeyInput && (
-                        <div className="px-5 py-4 bg-[#1a1a1c] border-b border-zinc-800 flex flex-col gap-2">
-                            <label className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
-                                <Key className="w-3 h-3" /> CREDENCIAL GEMINI API
-                            </label>
-                            <input
-                                type="password"
-                                value={apiKey}
-                                onChange={handleSaveKey}
-                                placeholder="AIzaxxxxxxxxxxxxx..."
-                                className="w-full bg-black/50 border border-zinc-700 text-zinc-300 rounded-lg px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
-                            />
+                        <div className="px-5 py-4 bg-[#1a1a1c] border-b border-zinc-800 flex flex-col gap-2 relative z-10 shadow-md">
+                            <div className="flex justify-between items-center">
+                                <label className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
+                                    <Key className="w-3 h-3" /> CREDENCIAL GEMINI API
+                                </label>
+                                <button onClick={() => setShowKeyInput(false)} className="text-zinc-500 hover:text-zinc-300 text-xs transition-colors">
+                                    Ocultar
+                                </button>
+                            </div>
+                            <div className="flex gap-2">
+                                <input
+                                    type="password"
+                                    value={apiKey}
+                                    onChange={handleSaveKey}
+                                    onKeyDown={(e) => e.key === 'Enter' && setShowKeyInput(false)}
+                                    placeholder="AIzaxxxxxxxxxxxxx..."
+                                    className="flex-1 bg-black/50 border border-zinc-700 text-zinc-300 rounded-lg px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                                />
+                                <button
+                                    onClick={() => setShowKeyInput(false)}
+                                    className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 rounded-lg text-sm font-bold transition-colors"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
                         </div>
                     )
                 }

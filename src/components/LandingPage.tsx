@@ -43,7 +43,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                 </h1>
 
                 <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mb-12 animate-fade-in-up" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
-                    Sube tus archivos crudos de Garmin. Extraemos tus métricas, analizamos tu desgaste biométrico (TSS) y nuestra IA creará el calendario predictivo perfecto para evitar el sobreentrenamiento.
+                    Sube tus datos crudos de Garmin. Define tu horizonte de fechas (salud, mantenimiento o competición) y nuestra IA calculará dinámicamente tus mesociclos y microciclos sin riesgo de sobreentrenamiento.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto animate-fade-in-up" style={{ animationDelay: '0.4s', animationFillMode: 'both' }}>
@@ -96,9 +96,9 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                             <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 mb-6 group-hover:scale-110 transition-transform">
                                 <Brain className="w-7 h-7" />
                             </div>
-                            <h3 className="text-xl font-bold mb-3 text-white">Planificador AI Reactivo</h3>
+                            <h3 className="text-xl font-bold mb-3 text-white">Periodización por Objetivos</h3>
                             <p className="text-zinc-400 leading-relaxed">
-                                Olvida las plantillas estáticas. Nuestra IA ajusta tus microciclos de entrenamiento en tiempo real basándose en tu acumulación de fatiga.
+                                Escoge entre Salud, Mantenimiento o Competición. Alimenta la IA con la fecha de tu evento y ella construirá retrospectivamente tus fases de Base, Construcción o Tapering.
                             </p>
                         </div>
 
@@ -107,9 +107,9 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                             <div className="w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-400 mb-6 group-hover:scale-110 transition-transform">
                                 <LineChart className="w-7 h-7" />
                             </div>
-                            <h3 className="text-xl font-bold mb-3 text-white">Perfil Biométrico 360°</h3>
+                            <h3 className="text-xl font-bold mb-3 text-white">Calendario Dinámico Mensual</h3>
                             <p className="text-zinc-400 leading-relaxed">
-                                Cronología exacta de tu peso (W/kg) y FTP manual. La IA usa estos datos combinados con el clima para predecir tu umbral aeróbico.
+                                Visualiza todo tu horizonte de entrenamiento. Rastrea tu carga real frente a la planificada y navega semanas a meses vista con un solo clic.
                             </p>
                         </div>
 
@@ -120,9 +120,9 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                                     <div className="w-14 h-14 bg-purple-500/10 rounded-2xl flex items-center justify-center text-purple-400 mb-6 group-hover:scale-110 transition-transform">
                                         <Zap className="w-7 h-7" />
                                     </div>
-                                    <h3 className="text-xl font-bold mb-3 text-white">Zonas de Potencia Dinámicas</h3>
+                                    <h3 className="text-xl font-bold mb-3 text-white">Sistema de Plantillas de Entrenamiento</h3>
                                     <p className="text-zinc-400 leading-relaxed">
-                                        El sistema recalcula tus zonas de entrenamiento (Z1-Z7) automáticamente con cada incremento detectado en el núcleo transaccional. Tu app siempre sabe cuándo estás en Sweet Spot y cuándo en el límite anaeróbico.
+                                        Crea tu biblioteca maestra de sesiones clave (Umbrales 4x8', V02Max 5x3'). Insértalas tú mismo en el calendario para forzar los estímulos, y deja que la IA se encargue de rellenar el microciclo calculando la recuperación necesaria.
                                     </p>
                                 </div>
                                 <div className="w-full md:w-1/3 aspect-square rounded-2xl border border-white/10 bg-gradient-to-br from-purple-500/20 to-transparent flex items-center justify-center relative overflow-hidden">

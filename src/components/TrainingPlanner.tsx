@@ -4,6 +4,8 @@ import { Info, X, Save } from 'lucide-react';
 import { TrainingBlock } from '../lib/fitUtils';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth, isToday } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 // Definición de Tipos de Entrenamiento
 export const TRAINING_BLOCKS = [
@@ -76,10 +78,24 @@ export const TRAINING_BLOCKS = [
     }
 ];
 
-const DAYS_OF_WEEK = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const DAYS_COLUMN_HEADERS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+// Helper para calcular vatios exactos por Coggan
+export function formatZoneWatts(ftp: number | null | undefined, zoneString: string) {
+    if (!ftp || ftp <= 0) return "";
+    const z = zoneString.toUpperCase();
+    if (z.includes('Z1')) return `< ${Math.round(ftp * 0.55)}W`;
+    if (z.includes('Z2')) return `${Math.round(ftp * 0.56)}-${Math.round(ftp * 0.75)}W`;
+    if (z.includes('Z3+')) return `${Math.round(ftp * 0.88)}-${Math.round(ftp * 0.93)}W`;
+    if (z.includes('Z3')) return `${Math.round(ftp * 0.76)}-${Math.round(ftp * 0.90)}W`;
+    if (z.includes('Z4')) return `${Math.round(ftp * 0.91)}-${Math.round(ftp * 1.05)}W`;
+    if (z.includes('Z5')) return `${Math.round(ftp * 1.06)}-${Math.round(ftp * 1.20)}W`;
+    if (z.includes('Z6')) return `> ${Math.round(ftp * 1.21)}W`;
+    return "";
+}
 
 // Componente: Tarjeta Arrastrable (Librería)
-function DraggableBlock({ id, block }: { id: string, block: typeof TRAINING_BLOCKS[0] }) {
+function DraggableBlock({ id, block, ftp }: { id: string, block: typeof TRAINING_BLOCKS[0], ftp?: number }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: id,
         data: block
@@ -91,51 +107,64 @@ function DraggableBlock({ id, block }: { id: string, block: typeof TRAINING_BLOC
         opacity: isDragging ? 0.8 : 1,
     } : undefined;
 
+    const watts = formatZoneWatts(ftp, block.zone);
+
     return (
         <div
             ref={setNodeRef} style={style} {...listeners} {...attributes}
-            className={`cursor-grab active:cursor-grabbing p-3 rounded-lg border backdrop-blur-sm mb-3 shadow-lg transition-colors hover:bg-zinc-800 ${block.color}`}
+            className={`cursor-grab active:cursor-grabbing p-3 rounded-lg border backdrop-blur-sm mb-3 shadow-lg transition-colors hover:bg-zinc-800 flex flex-col gap-1.5 ${block.color}`}
         >
-            <div className="flex justify-between items-start mb-1">
+            <div className="flex justify-between items-start">
                 <span className="text-xs font-bold px-1.5 py-0.5 rounded-sm bg-black/40">{block.zone}</span>
-                <span className="text-[10px] text-zinc-400 font-mono">{block.d}</span>
+                <span className="text-[10px] text-zinc-400 font-mono shrink-0 ml-1">{block.d}</span>
             </div>
-            <p className="text-sm font-semibold truncate">{block.title}</p>
+            {watts && (
+                <div className="text-[10px] font-mono opacity-80 leading-none truncate">
+                    ⚡ {watts}
+                </div>
+            )}
+            <p className="text-sm font-semibold truncate mt-0.5">{block.title}</p>
         </div>
     );
 }
 
-// Componente: Columna Destino (Días de la Semana)
-function DroppableDay({ id, title, assignments, onBlockClick }: { id: string, title: string, assignments: TrainingBlock[], onBlockClick: (b: TrainingBlock) => void }) {
+// Componente: Columna Destino (Días del Mes)
+function DroppableDay({ id, dateObj, currentMonth, assignments, onBlockClick, ftp }: { id: string, dateObj: Date, currentMonth: Date, assignments: TrainingBlock[], onBlockClick: (b: TrainingBlock) => void, ftp?: number }) {
     const { isOver, setNodeRef } = useDroppable({ id });
+    const isCurrentMonth = isSameMonth(dateObj, currentMonth);
+    const isCurrentDay = isToday(dateObj);
 
     return (
         <div
             ref={setNodeRef}
-            className={`flex flex-col min-h-[300px] p-3 rounded-xl border transition-colors relative group/day ${isOver ? 'bg-indigo-900/20 border-indigo-500/50' : 'bg-zinc-800/20 border-zinc-800'
-                }`}
+            className={`min-h-[140px] rounded-xl border flex flex-col overflow-hidden transition-all ${isOver ? 'bg-zinc-800/80 ring-2 ring-garmin-blue' : 'bg-black/20'} ${!isCurrentMonth ? 'opacity-40' : ''}`}
         >
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-zinc-800">
-                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">{title}</h3>
+            {/* Header del Día */}
+            <div className={`py-1.5 px-3 border-b flex justify-between items-center ${isCurrentDay ? 'bg-garmin-blue/20 border-garmin-blue/30' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                <h4 className={`text-sm font-bold ${isCurrentDay ? 'text-garmin-blue' : isCurrentMonth ? 'text-zinc-200' : 'text-zinc-600'}`}>
+                    {format(dateObj, 'd')}
+                </h4>
             </div>
 
-            <div className="flex-1 flex flex-col gap-2">
-                {assignments.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center text-xs text-zinc-600 font-mono">
-                        Descanso
-                    </div>
-                ) : (
+            {/* Contenido (Si no hay bloques, y estamos over, mostramos indicador visual) */}
+            <div className={`flex-1 p-2 flex flex-col gap-2 ${assignments?.length === 0 && isOver ? 'bg-garmin-blue/5' : ''}`}>
+                {assignments?.length > 0 && (
                     assignments.map((b, idx) => (
                         <div
                             key={`${b.id}-${idx}`}
                             onClick={() => onBlockClick(b)}
-                            className={`p-3 rounded-lg border ${b.color} relative group cursor-pointer hover:ring-2 hover:ring-white/20 transition-all`}
+                            className={`p-3 rounded-lg border ${b.color} relative group cursor-pointer hover:ring-2 hover:ring-white/20 transition-all flex flex-col gap-1.5`}
                         >
-                            <div className="flex justify-between items-start mb-1">
+                            <div className="flex justify-between items-start">
                                 <span className="text-xs font-bold px-1.5 py-0.5 rounded-sm bg-black/40">{b.zone}</span>
-                                <span className="text-[10px] opacity-70 font-mono">{b.d}</span>
+                                <span className="text-[10px] opacity-70 font-mono shrink-0 ml-1">{b.d}</span>
                             </div>
-                            <p className="text-sm font-semibold truncate leading-tight pr-5">{b.title}</p>
+                            {formatZoneWatts(ftp, b.zone) && (
+                                <div className="text-[10px] font-mono opacity-80 leading-none truncate">
+                                    ⚡ {formatZoneWatts(ftp, b.zone)}
+                                </div>
+                            )}
+                            <p className="text-sm font-semibold truncate leading-tight pr-5 mt-0.5">{b.title}</p>
                             <Info className="w-4 h-4 absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                     ))
@@ -145,9 +174,24 @@ function DroppableDay({ id, title, assignments, onBlockClick }: { id: string, ti
     );
 }
 
-export function TrainingPlanner({ schedule, setSchedule, session }: { schedule: Record<string, TrainingBlock[]>, setSchedule: React.Dispatch<React.SetStateAction<Record<string, TrainingBlock[]>>>, session: Session }) {
+export function TrainingPlanner({ schedule, setSchedule, session, profile }: { schedule: Record<string, TrainingBlock[]>, setSchedule: React.Dispatch<React.SetStateAction<Record<string, TrainingBlock[]>>>, session: Session, profile?: any }) {
     const [selectedBlock, setSelectedBlock] = useState<TrainingBlock | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+
+    // Extraer FTP para los cálculos de la librería y el calendario
+    const ftp = profile?.ftp_actual ? Number(profile.ftp_actual) : undefined;
+
+    // Generar Cuadrícula del Mes
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 }); // Lunes
+    const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
+
+    const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+    const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+    const handleToday = () => setCurrentMonth(new Date());
 
     const saveSchedule = async () => {
         if (!session) return;
@@ -175,15 +219,15 @@ export function TrainingPlanner({ schedule, setSchedule, session }: { schedule: 
 
             setSchedule(prev => ({
                 ...prev,
-                [dropDayId]: [...prev[dropDayId], blockData]
+                [dropDayId]: [...(prev[dropDayId] || []), blockData]
             }));
         }
     };
 
     const clearSchedule = () => {
-        setSchedule({
-            'Lunes': [], 'Martes': [], 'Miércoles': [], 'Jueves': [], 'Viernes': [], 'Sábado': [], 'Domingo': []
-        });
+        if (window.confirm("¿Seguro que deseas vaciar completamente TU CALENDARIO? Esto borrará el histórico y el futuro planificado.")) {
+            setSchedule({});
+        }
     }
 
     return (
@@ -191,14 +235,33 @@ export function TrainingPlanner({ schedule, setSchedule, session }: { schedule: 
 
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
                 <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight mb-2">Planificador Pro</h2>
-                    <p className="text-zinc-400">Construye tu meso-ciclo o pídele a la IA que llene el tablero.</p>
+                    <h2 className="text-3xl font-extrabold tracking-tight mb-2">Planificador Base</h2>
+                    <p className="text-zinc-400">Construye tus ciclos arrastrando bloques hacia el calendario real.</p>
                 </div>
+
+                <div className="flex items-center gap-2 bg-zinc-900/80 p-1.5 rounded-xl border border-zinc-800">
+                    <button onClick={handlePrevMonth} className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                    </button>
+                    <button onClick={handleToday} className="px-3 py-1.5 text-sm font-bold text-garmin-blue hover:text-garmin-blue/80 hover:bg-garmin-blue/10 rounded-lg transition-colors">
+                        Hoy
+                    </button>
+                    <button onClick={handleNextMonth} className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                    </button>
+                    <div className="px-4 text-center min-w-[140px]">
+                        <span className="text-base font-bold text-white capitalize">{format(currentMonth, 'MMMM yyyy', { locale: es })}</span>
+                    </div>
+                </div>
+
                 <div className="flex items-center gap-3">
                     <button
                         onClick={saveSchedule}
                         disabled={isSaving}
-                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all border shadow flex items-center gap-2 ${isSaving ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed' : 'bg-garmin-blue hover:bg-blue-600 text-white border-transparent'}`}
+                        className={`px-5 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 border shadow-lg ${isSaving
+                            ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed'
+                            : 'bg-garmin-blue/10 hover:bg-garmin-blue/25 text-garmin-blue hover:text-white border-garmin-blue/30 hover:border-garmin-blue/60 hover:-translate-y-0.5'
+                            }`}
                     >
                         <Save className="w-4 h-4" />
                         {isSaving ? 'Guardando...' : 'Guardar Plan'}
@@ -223,9 +286,9 @@ export function TrainingPlanner({ schedule, setSchedule, session }: { schedule: 
                         <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider mb-5 flex items-center gap-2">
                             Librería de Sesiones
                         </h3>
-                        <div className="space-y-1">
+                        <div className="space-y-2 overflow-y-auto pr-2 custom-scrollbar max-h-[500px]">
                             {TRAINING_BLOCKS.map(block => (
-                                <DraggableBlock key={block.id} id={block.id} block={block} />
+                                <DraggableBlock key={block.id} id={block.id} block={block} ftp={ftp} />
                             ))}
                         </div>
                         <p className="mt-6 text-xs text-zinc-500 text-center leading-relaxed">
@@ -233,18 +296,30 @@ export function TrainingPlanner({ schedule, setSchedule, session }: { schedule: 
                         </p>
                     </div>
 
-                    {/* Calendario (4 columnas xl) */}
-                    <div className="xl:col-span-4 overflow-x-auto">
-                        <div className="min-w-[800px] grid grid-cols-7 gap-3">
-                            {DAYS_OF_WEEK.map(day => (
-                                <DroppableDay
-                                    key={day}
-                                    id={day}
-                                    title={day}
-                                    assignments={schedule[day]}
-                                    onBlockClick={setSelectedBlock}
-                                />
+                    {/* Calendario Mensual (4 columnas xl) */}
+                    <div className="xl:col-span-4 bg-[#141416] border border-zinc-800/80 rounded-2xl p-5 shadow-inner">
+                        <div className="grid grid-cols-7 gap-1.5 mb-2">
+                            {DAYS_COLUMN_HEADERS.map(day => (
+                                <div key={day} className="text-center py-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500">
+                                    {day}
+                                </div>
                             ))}
+                        </div>
+                        <div className="grid grid-cols-7 gap-1.5 min-w-0">
+                            {calendarDays.map((dateObj) => {
+                                const dateStr = format(dateObj, 'yyyy-MM-dd');
+                                return (
+                                    <DroppableDay
+                                        key={dateStr}
+                                        id={dateStr}
+                                        dateObj={dateObj}
+                                        currentMonth={currentMonth}
+                                        assignments={schedule[dateStr] || []}
+                                        onBlockClick={setSelectedBlock}
+                                        ftp={ftp}
+                                    />
+                                );
+                            })}
                         </div>
                     </div>
 

@@ -2,20 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
 
-export function Dashboard({ session }: { session: Session }) {
+export function Dashboard({ session, activities, onDataChanged }: { session: Session, activities: any[], onDataChanged: () => Promise<void> }) {
     const [file, setFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [message, setMessage] = useState('');
-    const [activities, setActivities] = useState<any[]>([]);
-
     const fetchActivities = async () => {
         const { data, error } = await supabase
             .from('activities')
             .select('*')
+            .eq('user_id', session.user.id)
             .order('activity_date', { ascending: false });
 
         if (!error && data) {
-            setActivities(data);
+            // Note: Dashboard doesn't set global activities anymore, 
+            // but we kept this here in case we need local fetching. 
+            // In a full refactor, this might be removed entirely.
         }
     };
 
@@ -233,10 +234,11 @@ export function Dashboard({ session }: { session: Session }) {
             }
 
             setMessage(`✅ ¡Exito! Sincronización completa finalizada.`);
-            setFile(null);
-            fetchActivities();
+            // 3. Avisar al Componente Principal que los datos cambiaron
+            await onDataChanged();
+
         } catch (error: any) {
-            setMessage(`❌ Error al subir: ${error.message || 'Error desconocido'}`);
+            setMessage(`❌ Error al subir: ${error.message || 'Error desconocido'} `);
         } finally {
             setUploading(false);
         }
@@ -321,12 +323,12 @@ export function Dashboard({ session }: { session: Session }) {
                         ) : (
                             <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar min-h-[400px]">
                                 {activities.map((act) => (
-                                    <div key={act.id} className="p-5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
-                                        <div className="flex-1 min-w-0">
+                                    <div key={act.id} className="p-5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 transition-all flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5">
+                                        <div className="flex-1 min-w-0 w-full xl:w-auto">
                                             <p className="font-semibold text-garmin-blue text-lg truncate" title={act.file_name || act.titulo || 'Entrenamiento Garmin'}>
                                                 {act.file_name || act.titulo || 'Entrenamiento Garmin'}
                                             </p>
-                                            <p className="text-sm text-zinc-400 mt-1">
+                                            <p className="text-sm text-zinc-400 mt-1 truncate">
                                                 {act.activity_date
                                                     ? new Date(act.activity_date).toLocaleString('es-CL', {
                                                         timeZone: 'America/Santiago',
@@ -336,7 +338,7 @@ export function Dashboard({ session }: { session: Session }) {
                                                     : 'Fecha Desconocida'}
                                             </p>
                                         </div>
-                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm w-full md:w-auto bg-zinc-900/50 p-3 rounded-lg border border-zinc-700/30">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm w-full xl:w-fit bg-zinc-900/50 p-4 rounded-lg border border-zinc-700/30 shrink-0">
                                             <div className="flex flex-col">
                                                 <span className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Distancia</span>
                                                 <span className="font-semibold text-zinc-200">{parseFloat(act.distance_km || 0).toFixed(1)} <span className="text-zinc-500 font-normal">km</span></span>
