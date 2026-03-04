@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { AuthUI } from './components/AuthUI'
 import { Dashboard } from './components/Dashboard'
 import { AthleteProfile } from './components/AthleteProfile'
+import { OnboardingWizard } from './components/OnboardingWizard'
 import { TrainingPlanner } from './components/TrainingPlanner'
 import { AICoachModal } from './components/AICoachModal'
 import { AICoachPanel } from './components/AICoachPanel'
@@ -22,6 +23,7 @@ export default function App() {
     // Estados Globales (Caché en Memoria Viva)
     const [globalProfile, setGlobalProfile] = useState<any>(null)
     const [globalActivities, setGlobalActivities] = useState<any[]>([])
+    const [isLoadingData, setIsLoadingData] = useState(true)
 
     // Estado global del planificador para que la IA pueda inyectar rutinas (Formato YYYY-MM-DD)
     const [schedule, setSchedule] = useState<Record<string, TrainingBlock[]>>({})
@@ -29,6 +31,7 @@ export default function App() {
     // Función Centralizada para Recargar el Contexto desde Supabase
     const refreshGlobalData = async () => {
         if (!session) return;
+        setIsLoadingData(true);
 
         // 1. Descargar Perfil
         const { data: profileData } = await supabase
@@ -36,7 +39,12 @@ export default function App() {
             .select('*')
             .eq('id', session.user.id)
             .single();
-        if (profileData) setGlobalProfile(profileData);
+
+        if (profileData) {
+            setGlobalProfile(profileData);
+        } else {
+            setGlobalProfile(null);
+        }
 
         // 2. Descargar Actividades (Limitadas a las últimas 50 para rendimiento y IA)
         const { data: actsData } = await supabase
@@ -45,6 +53,8 @@ export default function App() {
             .order('activity_date', { ascending: false })
             .limit(50);
         if (actsData) setGlobalActivities(actsData);
+
+        setIsLoadingData(false);
     };
 
     // Efecto Inicial: Cargar Plan Semanal y Contexto Global al loguearse
@@ -95,9 +105,6 @@ export default function App() {
                         <h1 className="text-3xl font-bold tracking-tight">
                             Cycling <span className="gradient-text">AI Trainer</span>
                         </h1>
-                        <p className="text-zinc-400">
-                            Inicia sesión para continuar.
-                        </p>
                         <AuthUI onSessionChange={(s) => setSession(s)} />
                     </div>
                 )
@@ -151,21 +158,13 @@ export default function App() {
                         </div>
                     </div>
 
-                    {/* ENRUTAMIENTO PRINCIPAL: SI FALTA FTP/PESO, FORZAMOS ONBOARDING */}
-                    {globalProfile && (!globalProfile.ftp_actual || !globalProfile.peso_actual_kg) ? (
-                        <div className="flex-1 w-full bg-[#111113] border border-amber-500/30 rounded-2xl overflow-hidden p-0 relative shadow-2xl flex flex-col items-center justify-center animate-in zoom-in-95 duration-500">
-                            <div className="absolute inset-0 bg-amber-500/5 pointer-events-none"></div>
-                            <div className="p-4 sm:p-8 max-w-4xl w-full z-10 overflow-y-auto max-h-full custom-scrollbar">
-                                <div className="text-center mb-8">
-                                    <div className="w-16 h-16 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/50">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 3.5 0 0 0 0 7h5a3.5 3.5 3.5 0 0 1 0 7H6" /></svg>
-                                    </div>
-                                    <h2 className="text-3xl font-bold text-white mb-2">¡Alto ahí! Falta tu Motor.</h2>
-                                    <p className="text-zinc-400 max-w-lg mx-auto">Para que la caja de herramientas, los planes y la IA funcionen visualmente por zonas de entrenamiento, es <b>OBLIGATORIO</b> configurar tu FTP y Peso Actual.</p>
-                                </div>
-                                <AthleteProfile session={session} profile={globalProfile} onDataChanged={refreshGlobalData} />
-                            </div>
+                    {/* ENRUTAMIENTO PRINCIPAL: SI FALTA FTP/PESO O NO TIENE PERFIL, FORZAMOS ONBOARDING */}
+                    {isLoadingData ? (
+                        <div className="flex-1 w-full flex items-center justify-center">
+                            <div className="animate-spin w-10 h-10 border-4 border-zinc-800 border-t-garmin-blue rounded-full"></div>
                         </div>
+                    ) : (!globalProfile || !globalProfile.ftp_actual || !globalProfile.peso_actual_kg) ? (
+                        <OnboardingWizard session={session} initialProfile={globalProfile} onComplete={refreshGlobalData} />
                     ) : (
                         <div className="flex-1 w-full flex flex-col lg:flex-row gap-6 overflow-hidden min-h-0">
                             {/* COLUMNA IZQUIERDA: Herramientas (Dashboard / Planner) */}
@@ -199,6 +198,7 @@ export default function App() {
                                     session={session}
                                     athleteProfile={globalProfile}
                                     recentActivitiesData={globalActivities}
+                                    scheduleData={schedule}
                                     onApplyPlan={(plan) => setSchedule(plan)}
                                     onNavigate={(v) => setActiveTab(v as any)}
                                 />
@@ -244,6 +244,7 @@ export default function App() {
                         session={session}
                         athleteProfile={globalProfile}
                         recentActivitiesData={globalActivities}
+                        scheduleData={schedule}
                     />
                 </div>
             )}

@@ -11,6 +11,8 @@ export type TrainingBlock = {
     d: string;
     color?: string;
     description?: string; // Texto estructurado paso a paso para el usuario
+    status?: 'planned' | 'completed_full' | 'completed_partial' | 'missed';
+    completionNotes?: string;
 };
 
 function parseDurationToMs(d: string): number {

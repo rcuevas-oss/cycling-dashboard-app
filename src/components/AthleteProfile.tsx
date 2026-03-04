@@ -12,6 +12,7 @@ export function AthleteProfile({ session, profile, onDataChanged }: { session: S
         sexo: 'Masculino',
         disciplina: 'Ruta',
         objetivo: 'Mantenimiento / Fitness General',
+        disponibilidad: '',
         fechaEvento: '',
         ftpActual: '',
         pesoActual: '',
@@ -28,6 +29,7 @@ export function AthleteProfile({ session, profile, onDataChanged }: { session: S
                 sexo: profile.sexo || 'Masculino',
                 disciplina: profile.disciplina || 'Ruta',
                 objetivo: profile.objetivo || 'Mantenimiento / Fitness General',
+                disponibilidad: profile.disponibilidad || '',
                 fechaEvento: profile.fecha_evento || '',
                 ftpActual: profile.ftp_actual?.toString() || '',
                 pesoActual: profile.peso_actual_kg?.toString() || '',
@@ -148,6 +150,14 @@ export function AthleteProfile({ session, profile, onDataChanged }: { session: S
                                 <option value="Mantenimiento / Fitness General">Mantenimiento / Fitness General (Mantener base, divertirse)</option>
                                 <option value="Competición / Evento Específico">Competición / Evento Específico (Preparación estructurada)</option>
                             </select>
+                        </div>
+                        <div className="flex flex-col gap-2 col-span-2">
+                            <label className="text-sm font-medium text-zinc-300">Días y Horas Disponibles para Entrenar</label>
+                            <input type="text" name="disponibilidad" value={formData.disponibilidad || ''} onChange={handleInputChange}
+                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:outline-none focus:border-garmin-blue transition-colors"
+                                placeholder="Ej. Lunes, Miércoles, Viernes (1.5h/día)"
+                            />
+                            <p className="text-xs text-zinc-500">Define aquí tus días libres específicos. La IA leerá esto y <b>no</b> programará entrenamientos en los días que no señales.</p>
                         </div>
 
                         <div className="flex flex-col gap-2 col-span-2">

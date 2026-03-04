@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Send, Zap, Key, Flag } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Bot, Send, Zap, Flag } from 'lucide-react';
 import { TrainingBlock } from '../lib/fitUtils';
 import { generateWeeklyPlan } from '../lib/gemini';
 import ReactMarkdown from 'react-markdown';
@@ -8,10 +8,11 @@ import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
 
 interface AICoachPanelProps {
-    onApplyPlan?: (plan: Record<string, TrainingBlock[]>) => void;
     session: Session;
     athleteProfile?: any;
     recentActivitiesData?: any[];
+    scheduleData?: Record<string, TrainingBlock[]>;
+    onApplyPlan?: (plan: Record<string, TrainingBlock[]>) => void;
     onNavigate?: (view: string) => void;
 }
 
@@ -24,45 +25,27 @@ interface ChatMessage {
     isGreeting?: boolean;
 }
 
-export function AICoachPanel({ onApplyPlan, session, athleteProfile, recentActivitiesData, onNavigate }: AICoachPanelProps) {
-    const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
-    const [showKeyInput, setShowKeyInput] = useState(false);
+export function AICoachPanel({ session, athleteProfile, recentActivitiesData, scheduleData, onApplyPlan, onNavigate }: AICoachPanelProps) {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
     const [inputMsg, setInputMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [hasSentWelcome, setHasSentWelcome] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!apiKey && messages.length === 0) {
-            setShowKeyInput(true);
-        }
-    }, [apiKey, messages.length]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, isLoading]);
 
-    // EFECTO PROACTIVO: Auto-Diagnóstico de Bienvenida
-    useEffect(() => {
-        if (apiKey && messages.length === 0 && !hasSentWelcome && athleteProfile && (recentActivitiesData?.length ?? 0) > 0) {
-            setHasSentWelcome(true);
-            handleSend("Analiza mi estado de forma actual y dame un diagnóstico basado en la carga reciente.", true);
-        }
-    }, [apiKey, athleteProfile, recentActivitiesData, hasSentWelcome]);
-
-    const handleSaveKey = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        setApiKey(val);
-        localStorage.setItem('gemini_api_key', val);
-    };
-
     const handleSend = async (forcedMessage?: string, isSilentUserMessage: boolean = false) => {
         const messageToSend = forcedMessage || inputMsg;
         if (!messageToSend.trim()) return;
         if (!apiKey) {
-            setShowKeyInput(true);
+            setMessages(prev => [...prev, {
+                id: Date.now().toString() + '-error',
+                role: 'ai',
+                content: '⚠️ No has configurado tu clave API de Gemini en .env.local. La IA no puede responder.'
+            }]);
             return;
         }
 
@@ -95,7 +78,8 @@ export function AICoachPanel({ onApplyPlan, session, athleteProfile, recentActiv
                 relacion_wkg: vatios_por_kilo,
                 disciplina: disciplinaGuardada,
                 objetivo_principal: objetivoGuardado,
-                fecha_evento: fechaEventoGuardada
+                fecha_evento: fechaEventoGuardada,
+                disponibilidad_semanal: athleteProfile?.disponibilidad || "Disponibilidad completa (Acepta cualquier día, asume 1-2h diarias)."
             };
 
             const hoy = new Date();
@@ -142,7 +126,7 @@ export function AICoachPanel({ onApplyPlan, session, athleteProfile, recentActiv
                 }
             };
 
-            const response = await generateWeeklyPlan(apiKey, newMsg, enrichedAthleteContext, recentActivities);
+            const response = await generateWeeklyPlan(apiKey, newMsg, enrichedAthleteContext, recentActivities, scheduleData);
 
             // Interceptar intención de IA de abrir el planificador o dashboard (Opcional, futuro)
             // Si la IA dice "Abre el planificador", podríamos onNavigate('planner')
@@ -205,9 +189,6 @@ export function AICoachPanel({ onApplyPlan, session, athleteProfile, recentActiv
                             </h2>
                             <p className="text-[10px] uppercase tracking-wider flex items-center gap-1 text-zinc-500">
                                 Powered by Gemini 1.5
-                                <button onClick={() => setShowKeyInput(!showKeyInput)} className="hover:text-amber-400 transition-colors ml-1">
-                                    <Key className="w-3 h-3" />
-                                </button>
                             </p>
                         </div>
                     </div>
@@ -243,42 +224,27 @@ export function AICoachPanel({ onApplyPlan, session, athleteProfile, recentActiv
                     )}
                 </div>
             </div>
-
-            {showKeyInput && (
-                <div className="px-5 py-4 bg-[#1a1a1c] border-b border-zinc-800 flex flex-col gap-2 relative z-10 shadow-md">
-                    <div className="flex justify-between items-center">
-                        <label className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
-                            <Key className="w-3 h-3" /> CREDENCIAL GEMINI API
-                        </label>
-                        <button onClick={() => setShowKeyInput(false)} className="text-zinc-500 hover:text-zinc-300 text-xs transition-colors">
-                            Ocultar
-                        </button>
-                    </div>
-                    <div className="flex gap-2">
-                        <input
-                            type="password"
-                            value={apiKey}
-                            onChange={handleSaveKey}
-                            onKeyDown={(e) => e.key === 'Enter' && setShowKeyInput(false)}
-                            placeholder="AIza..."
-                            className="flex-1 bg-black/50 border border-zinc-700 text-zinc-300 rounded-lg px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
-                        />
-                        <button
-                            onClick={() => setShowKeyInput(false)}
-                            className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 rounded-lg text-sm font-bold transition-colors"
-                        >
-                            Guardar
-                        </button>
-                    </div>
-                </div>
-            )}
-
             {/* Chat Area */}
             <div className="flex-1 overflow-y-auto p-5 space-y-6 flex flex-col">
                 {messages.length === 0 && !isLoading && (
-                    <div className="flex-1 flex flex-col justify-center items-center opacity-50">
-                        <Bot className="w-12 h-12 text-zinc-600 mb-4" />
-                        <p className="text-sm text-zinc-500">Listo para dominar la temporada.</p>
+                    <div className="flex-1 flex flex-col justify-center items-center opacity-80 mt-10">
+                        <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4 ring-1 ring-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.15)]">
+                            <Bot className="w-8 h-8 text-indigo-400" />
+                        </div>
+                        <h3 className="text-zinc-200 font-bold mb-1">Coach de Inteligencia Artificial</h3>
+                        <p className="text-sm text-zinc-500 mb-8 text-center max-w-[250px]">
+                            La IA analiza tu carga fisiológica reciente para recomendarte tu siguiente paso.
+                        </p>
+
+                        <div className="flex flex-col gap-3 w-full max-w-[280px]">
+                            <button
+                                onClick={() => handleSend("Analiza mi estado de forma actual y dame un diagnóstico basado en la carga reciente.", true)}
+                                className="w-full py-3 px-4 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 hover:text-indigo-200 rounded-xl text-sm font-bold shadow-[0_0_15px_rgba(99,102,241,0.2)] hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] flex items-center justify-center gap-2 transition-all"
+                            >
+                                <Zap className="w-4 h-4" />
+                                Generar Diagnóstico Inicial
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -333,14 +299,19 @@ export function AICoachPanel({ onApplyPlan, session, athleteProfile, recentActiv
                     ))}
 
                     {isLoading && (
-                        <div className="flex flex-col gap-1.5 items-start">
+                        <div className="flex flex-col gap-1.5 items-start mb-6">
                             <div className="flex items-center gap-1.5 ml-1 mb-0.5">
                                 <Bot className="w-3.5 h-3.5 text-indigo-400" />
                                 <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">Coach AI</span>
                             </div>
-                            <div className="bg-[#18181b] rounded-2xl rounded-tl-sm px-5 py-4 text-sm text-zinc-400 border border-zinc-800 flex items-center gap-3">
-                                <div className="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
-                                <span>Analizando...</span>
+                            <div className="bg-[#18181b] rounded-2xl rounded-tl-sm px-5 py-5 text-sm w-full max-w-[280px] border border-zinc-800 shadow-md">
+                                <div className="flex justify-between items-center text-xs text-zinc-400 mb-3 font-medium">
+                                    <span className="animate-pulse">Calculando biometría y carga...</span>
+                                    <Zap className="w-3 h-3 text-amber-500 animate-bounce" />
+                                </div>
+                                <div className="w-full bg-zinc-800/50 rounded-full h-1.5 overflow-hidden">
+                                    <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 h-1.5 rounded-full w-full animate-pulse"></div>
+                                </div>
                             </div>
                         </div>
                     )}

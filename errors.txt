@@ -1,0 +1,2 @@
+src/components/AICoachModal.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/AICoachPanel.tsx(1,8): error TS6133: 'React' is declared but its value is never read.

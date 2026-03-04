@@ -4,7 +4,7 @@ import { Info, X, Save } from 'lucide-react';
 import { TrainingBlock } from '../lib/fitUtils';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth, isToday } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 // Definición de Tipos de Entrenamiento
@@ -129,10 +129,11 @@ function DraggableBlock({ id, block, ftp }: { id: string, block: typeof TRAINING
 }
 
 // Componente: Columna Destino (Días del Mes)
-function DroppableDay({ id, dateObj, currentMonth, assignments, onBlockClick, ftp }: { id: string, dateObj: Date, currentMonth: Date, assignments: TrainingBlock[], onBlockClick: (b: TrainingBlock) => void, ftp?: number }) {
+function DroppableDay({ id, dateObj, currentMonth, assignments, onBlockClick, ftp }: { id: string, dateObj: Date, currentMonth: Date, assignments: TrainingBlock[], onBlockClick: (b: TrainingBlock, dateId: string) => void, ftp?: number }) {
     const { isOver, setNodeRef } = useDroppable({ id });
     const isCurrentMonth = isSameMonth(dateObj, currentMonth);
     const isCurrentDay = isToday(dateObj);
+    const isPastDay = isBefore(startOfDay(dateObj), startOfDay(new Date()));
 
     return (
         <div
@@ -152,19 +153,27 @@ function DroppableDay({ id, dateObj, currentMonth, assignments, onBlockClick, ft
                     assignments.map((b, idx) => (
                         <div
                             key={`${b.id}-${idx}`}
-                            onClick={() => onBlockClick(b)}
-                            className={`p-3 rounded-lg border ${b.color} relative group cursor-pointer hover:ring-2 hover:ring-white/20 transition-all flex flex-col gap-1.5`}
+                            onClick={() => onBlockClick(b, id)}
+                            className={`p-3 rounded-lg border relative group cursor-pointer hover:ring-2 hover:ring-white/20 transition-all flex flex-col gap-1.5
+                                ${b.status === 'completed_full' ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]' :
+                                    b.status === 'completed_partial' ? 'bg-amber-500/20 border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.2)]' :
+                                        b.status === 'missed' ? 'bg-rose-500/10 border-rose-500/30 opacity-60' :
+                                            (isPastDay && (!b.status || b.status === 'planned')) ? 'opacity-50 grayscale border-zinc-700' :
+                                                b.color
+                                }`}
                         >
                             <div className="flex justify-between items-start">
-                                <span className="text-xs font-bold px-1.5 py-0.5 rounded-sm bg-black/40">{b.zone}</span>
-                                <span className="text-[10px] opacity-70 font-mono shrink-0 ml-1">{b.d}</span>
+                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-sm bg-black/40 ${b.status === 'completed_full' ? 'text-emerald-400' : b.status === 'completed_partial' ? 'text-amber-400' : ''}`}>{b.zone}</span>
+                                <span className="text-[10px] opacity-70 font-mono shrink-0 ml-1">
+                                    {b.status === 'completed_full' ? '✅' : b.status === 'completed_partial' ? '⚠️' : b.status === 'missed' ? '❌' : b.d}
+                                </span>
                             </div>
                             {formatZoneWatts(ftp, b.zone) && (
-                                <div className="text-[10px] font-mono opacity-80 leading-none truncate">
+                                <div className="text-[10px] font-mono opacity-80 leading-none truncate mt-1">
                                     ⚡ {formatZoneWatts(ftp, b.zone)}
                                 </div>
                             )}
-                            <p className="text-sm font-semibold truncate leading-tight pr-5 mt-0.5">{b.title}</p>
+                            <p className={`text-sm font-semibold truncate leading-tight pr-5 mt-0.5 ${b.status === 'missed' ? 'line-through text-zinc-500' : ''}`}>{b.title}</p>
                             <Info className="w-4 h-4 absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                     ))
@@ -175,7 +184,7 @@ function DroppableDay({ id, dateObj, currentMonth, assignments, onBlockClick, ft
 }
 
 export function TrainingPlanner({ schedule, setSchedule, session, profile }: { schedule: Record<string, TrainingBlock[]>, setSchedule: React.Dispatch<React.SetStateAction<Record<string, TrainingBlock[]>>>, session: Session, profile?: any }) {
-    const [selectedBlock, setSelectedBlock] = useState<TrainingBlock | null>(null);
+    const [selectedBlock, setSelectedBlock] = useState<{ block: TrainingBlock, dateId: string } | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -254,27 +263,31 @@ export function TrainingPlanner({ schedule, setSchedule, session, profile }: { s
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={saveSchedule}
-                        disabled={isSaving}
-                        className={`px-5 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 border shadow-lg ${isSaving
-                            ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed'
-                            : 'bg-garmin-blue/10 hover:bg-garmin-blue/25 text-garmin-blue hover:text-white border-garmin-blue/30 hover:border-garmin-blue/60 hover:-translate-y-0.5'
-                            }`}
-                    >
-                        <Save className="w-4 h-4" />
-                        {isSaving ? 'Guardando...' : 'Guardar Plan'}
-                    </button>
-                    <div className="px-4 py-2 bg-zinc-800/50 rounded-lg border border-zinc-700">
-                        <p className="text-xs text-zinc-400 uppercase tracking-wider font-semibold">Carga Est. (TSS)</p>
+                <div className="flex flex-col md:flex-row items-end md:items-center gap-4 shrink-0 mt-4 md:mt-0">
+                    <div className="px-4 py-2 bg-zinc-800/50 rounded-lg border border-zinc-700 shrink-0">
+                        <p className="text-xs text-zinc-400 uppercase tracking-wider font-semibold whitespace-nowrap">Carga Est. (TSS)</p>
                         <p className="text-xl font-bold font-mono text-amber-400 text-right mt-1">
                             {Object.values(schedule).flat().length * 60} <span className="text-sm text-zinc-500">tss</span>
                         </p>
                     </div>
-                    <button onClick={clearSchedule} className="px-4 py-2 text-sm text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors border border-transparent hover:border-rose-500/20">
-                        Limpiar
-                    </button>
+
+                    <div className="flex items-center gap-3 pr-2">
+                        <button onClick={clearSchedule} className="text-sm font-medium text-zinc-500 hover:text-rose-400 transition-colors whitespace-nowrap">
+                            Limpiar
+                        </button>
+                        <div className="w-px h-4 bg-zinc-800"></div>
+                        <button
+                            onClick={saveSchedule}
+                            disabled={isSaving}
+                            className={`text-sm font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap ${isSaving
+                                ? 'text-zinc-600 cursor-not-allowed'
+                                : 'text-garmin-blue hover:text-[#00cfa7]'
+                                }`}
+                        >
+                            <Save className="w-4 h-4" />
+                            {isSaving ? 'Guardando...' : 'Guardar Plan'}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -315,7 +328,7 @@ export function TrainingPlanner({ schedule, setSchedule, session, profile }: { s
                                         dateObj={dateObj}
                                         currentMonth={currentMonth}
                                         assignments={schedule[dateStr] || []}
-                                        onBlockClick={setSelectedBlock}
+                                        onBlockClick={(b, dateId) => setSelectedBlock({ block: b, dateId })}
                                         ftp={ftp}
                                     />
                                 );
@@ -331,10 +344,10 @@ export function TrainingPlanner({ schedule, setSchedule, session, profile }: { s
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
                     <div className="bg-zinc-900 border border-zinc-700 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col">
 
-                        <div className={`p-5 flex justify-between items-center ${selectedBlock.color?.split(' ')[0]} border-b border-zinc-700/50`}>
+                        <div className={`p-5 flex justify-between items-center ${selectedBlock.block.color?.split(' ')[0]} border-b border-zinc-700/50`}>
                             <div>
-                                <h3 className="font-bold text-xl text-white">{selectedBlock.title}</h3>
-                                <p className="text-xs opacity-80 font-mono mt-1 text-white/80">{selectedBlock.zone} • {selectedBlock.d}</p>
+                                <h3 className="font-bold text-xl text-white">{selectedBlock.block.title}</h3>
+                                <p className="text-xs opacity-80 font-mono mt-1 text-white/80">{selectedBlock.block.zone} • {selectedBlock.block.d}</p>
                             </div>
                             <button onClick={() => setSelectedBlock(null)} className="p-2 bg-black/20 hover:bg-black/40 text-white rounded-lg transition-colors">
                                 <X className="w-5 h-5" />
@@ -347,16 +360,90 @@ export function TrainingPlanner({ schedule, setSchedule, session, profile }: { s
                                 Recrea esta estructura paso a paso en Garmin Connect (Móvil o PC):
                             </p>
                             <div className="bg-zinc-950 rounded-xl p-5 font-mono text-sm leading-relaxed whitespace-pre-wrap border border-zinc-800 text-zinc-300 shadow-inner">
-                                {selectedBlock.description || "Entrenamiento libre. Mantén el esfuerzo en la zona indicada."}
+                                {selectedBlock.block.description || "Entrenamiento libre. Mantén el esfuerzo en la zona indicada."}
+                            </div>
+
+                            {/* Actions to update block status */}
+                            <div className="mt-6 border-t border-zinc-800/50 pt-5">
+                                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">Estado del Entrenamiento</p>
+                                <div className="flex flex-col gap-2">
+                                    <button
+                                        onClick={() => {
+                                            const updatedSchedule = { ...schedule };
+                                            const index = updatedSchedule[selectedBlock.dateId].findIndex(b => b.id === selectedBlock.block.id);
+                                            if (index !== -1) {
+                                                updatedSchedule[selectedBlock.dateId][index] = { ...selectedBlock.block, status: 'completed_full' };
+                                                setSchedule(updatedSchedule);
+                                                setSelectedBlock(null);
+                                            }
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg border transition-all flex items-center gap-3 ${selectedBlock.block.status === 'completed_full' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-black/20 border-zinc-800 hover:bg-emerald-500/10 hover:border-emerald-500/50 text-zinc-400'}`}
+                                    >
+                                        <span className="text-xl">✅</span>
+                                        <div>
+                                            <p className="font-semibold text-sm">Completado al 100%</p>
+                                            <p className="text-xs opacity-75">El entrenamiento se realizó según lo indicado.</p>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        onClick={() => {
+                                            const updatedSchedule = { ...schedule };
+                                            const index = updatedSchedule[selectedBlock.dateId].findIndex(b => b.id === selectedBlock.block.id);
+                                            if (index !== -1) {
+                                                updatedSchedule[selectedBlock.dateId][index] = { ...selectedBlock.block, status: 'completed_partial' };
+                                                setSchedule(updatedSchedule);
+                                                setSelectedBlock(null);
+                                            }
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg border transition-all flex items-center gap-3 ${selectedBlock.block.status === 'completed_partial' ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-black/20 border-zinc-800 hover:bg-amber-500/10 hover:border-amber-500/50 text-zinc-400'}`}
+                                    >
+                                        <span className="text-xl">⚠️</span>
+                                        <div>
+                                            <p className="font-semibold text-sm">Completado Parcialmente</p>
+                                            <p className="text-xs opacity-75">Se cortó antes o no se cumplieron las zonas.</p>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        onClick={() => {
+                                            const updatedSchedule = { ...schedule };
+                                            const index = updatedSchedule[selectedBlock.dateId].findIndex(b => b.id === selectedBlock.block.id);
+                                            if (index !== -1) {
+                                                updatedSchedule[selectedBlock.dateId][index] = { ...selectedBlock.block, status: 'missed' };
+                                                setSchedule(updatedSchedule);
+                                                setSelectedBlock(null);
+                                            }
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg border transition-all flex items-center gap-3 ${selectedBlock.block.status === 'missed' ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-black/20 border-zinc-800 hover:bg-rose-500/10 hover:border-rose-500/50 text-zinc-400'}`}
+                                    >
+                                        <span className="text-xl">❌</span>
+                                        <div>
+                                            <p className="font-semibold text-sm">No Realizado</p>
+                                            <p className="text-xs opacity-75">Se faltó a la sesión por descanso o impedimento.</p>
+                                        </div>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="p-4 border-t border-zinc-800 bg-zinc-900 flex justify-end">
+                        <div className="p-4 border-t border-zinc-800 bg-zinc-900 flex justify-end gap-2">
+                            <button
+                                onClick={() => {
+                                    const updatedSchedule = { ...schedule };
+                                    updatedSchedule[selectedBlock.dateId] = updatedSchedule[selectedBlock.dateId].filter(b => b.id !== selectedBlock.block.id);
+                                    setSchedule(updatedSchedule);
+                                    setSelectedBlock(null);
+                                }}
+                                className="px-5 py-2.5 bg-black hover:bg-rose-900/40 text-rose-500 border border-rose-900/50 rounded-xl transition-colors font-semibold"
+                            >
+                                Eliminar del Calendario
+                            </button>
                             <button
                                 onClick={() => setSelectedBlock(null)}
                                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-colors shadow-lg shadow-indigo-500/20 font-semibold"
                             >
-                                Entendido
+                                Cerrar
                             </button>
                         </div>
 
