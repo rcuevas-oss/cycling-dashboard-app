@@ -87,7 +87,7 @@ export default function App() {
     }, [session])
 
     return (
-        <div className="fixed inset-0 bg-background text-zinc-100 flex items-center justify-center overflow-hidden">
+        <div className={`bg-background text-zinc-100 flex items-center justify-center ${session ? 'fixed inset-0 overflow-hidden' : 'min-h-screen relative overflow-x-hidden'}`}>
             {!session ? (
                 !showAuth ? (
                     <LandingPage onGetStarted={() => setShowAuth(true)} />
