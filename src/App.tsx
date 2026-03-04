@@ -87,7 +87,7 @@ export default function App() {
     }, [session])
 
     return (
-        <div className="min-h-screen bg-background text-zinc-100 flex items-center justify-center overflow-hidden relative">
+        <div className="fixed inset-0 bg-background text-zinc-100 flex items-center justify-center overflow-hidden">
             {!session ? (
                 !showAuth ? (
                     <LandingPage onGetStarted={() => setShowAuth(true)} />
@@ -109,7 +109,7 @@ export default function App() {
                     </div>
                 )
             ) : (
-                <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 transition-all duration-500 h-[100dvh] flex flex-col gap-4 relative">
+                <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 transition-all duration-500 h-full flex flex-col gap-4 relative">
                     {/* APP HEADER MINIMALISTA */}
                     <div className="flex justify-between items-center bg-[#111113] border border-zinc-800 rounded-2xl p-4 shadow-sm shrink-0">
                         <div className="flex items-center gap-3">

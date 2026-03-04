@@ -310,29 +310,33 @@ export function TrainingPlanner({ schedule, setSchedule, session, profile }: { s
                     </div>
 
                     {/* Calendario Mensual (4 columnas xl) */}
-                    <div className="xl:col-span-4 bg-[#141416] border border-zinc-800/80 rounded-2xl p-5 shadow-inner">
-                        <div className="grid grid-cols-7 gap-1.5 mb-2">
-                            {DAYS_COLUMN_HEADERS.map(day => (
-                                <div key={day} className="text-center py-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500">
-                                    {day}
+                    <div className="xl:col-span-4 bg-[#141416] border border-zinc-800/80 rounded-2xl flex flex-col overflow-hidden shadow-inner">
+                        <div className="flex-1 overflow-x-auto p-5 custom-scrollbar">
+                            <div className="min-w-[800px]">
+                                <div className="grid grid-cols-7 gap-1.5 mb-2">
+                                    {DAYS_COLUMN_HEADERS.map(day => (
+                                        <div key={day} className="text-center py-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500">
+                                            {day}
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                        <div className="grid grid-cols-7 gap-1.5 min-w-0">
-                            {calendarDays.map((dateObj) => {
-                                const dateStr = format(dateObj, 'yyyy-MM-dd');
-                                return (
-                                    <DroppableDay
-                                        key={dateStr}
-                                        id={dateStr}
-                                        dateObj={dateObj}
-                                        currentMonth={currentMonth}
-                                        assignments={schedule[dateStr] || []}
-                                        onBlockClick={(b, dateId) => setSelectedBlock({ block: b, dateId })}
-                                        ftp={ftp}
-                                    />
-                                );
-                            })}
+                                <div className="grid grid-cols-7 gap-1.5 min-w-0">
+                                    {calendarDays.map((dateObj) => {
+                                        const dateStr = format(dateObj, 'yyyy-MM-dd');
+                                        return (
+                                            <DroppableDay
+                                                key={dateStr}
+                                                id={dateStr}
+                                                dateObj={dateObj}
+                                                currentMonth={currentMonth}
+                                                assignments={schedule[dateStr] || []}
+                                                onBlockClick={(b, dateId) => setSelectedBlock({ block: b, dateId })}
+                                                ftp={ftp}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
