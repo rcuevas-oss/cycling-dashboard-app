@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AuthUI } from './components/AuthUI'
 import { Dashboard } from './components/Dashboard'
 import { AthleteProfile } from './components/AthleteProfile'
@@ -20,6 +20,25 @@ export default function App() {
     const [schedule, setSchedule] = useState<Record<string, TrainingBlock[]>>({
         'Lunes': [], 'Martes': [], 'Miércoles': [], 'Jueves': [], 'Viernes': [], 'Sábado': [], 'Domingo': []
     })
+
+    // Efecto para cargar el plan del usuario al loguearse
+    useEffect(() => {
+        const fetchSchedule = async () => {
+            if (session) {
+                const { data, error } = await supabase
+                    .from('user_schedules')
+                    .select('schedule_data')
+                    .eq('user_id', session.user.id)
+                    .single()
+
+                if (!error && data && data.schedule_data) {
+                    // Si encontramos un plan guardado, lo restauramos
+                    setSchedule(data.schedule_data as Record<string, TrainingBlock[]>)
+                }
+            }
+        }
+        fetchSchedule()
+    }, [session])
 
     return (
         <div className="min-h-screen bg-background text-zinc-100 flex items-center justify-center overflow-hidden relative">
@@ -88,7 +107,7 @@ export default function App() {
                     <div className="flex-1 w-full h-full animate-in fade-in duration-500">
                         {activeTab === 'dashboard' && <Dashboard session={session} />}
                         {activeTab === 'profile' && <AthleteProfile session={session} />}
-                        {activeTab === 'planner' && <TrainingPlanner schedule={schedule} setSchedule={setSchedule} />}
+                        {activeTab === 'planner' && <TrainingPlanner schedule={schedule} setSchedule={setSchedule} session={session} />}
                     </div>
                 </div>
             )}

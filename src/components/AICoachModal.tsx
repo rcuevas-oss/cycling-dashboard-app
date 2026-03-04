@@ -348,7 +348,20 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session }: AICoachM
                                             <button
                                                 onClick={() => {
                                                     if (onApplyPlan && m.plan) {
+                                                        // 1. Aplicarlo localmente instantáneo
                                                         onApplyPlan(m.plan);
+
+                                                        // 2. Guardarlo en la nube en background
+                                                        if (session) {
+                                                            supabase
+                                                                .from('user_schedules')
+                                                                .upsert({ user_id: session.user.id, schedule_data: m.plan })
+                                                                .then(({ error }) => {
+                                                                    if (error) console.error("Error auto-guardando plan AI:", error);
+                                                                });
+                                                        }
+
+                                                        // 3. Cerrar el modal
                                                         onClose();
                                                     }
                                                 }}

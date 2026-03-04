@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { DndContext, useDraggable, useDroppable, DragEndEvent } from '@dnd-kit/core';
-import { Info, X } from 'lucide-react';
+import { Info, X, Save } from 'lucide-react';
 import { TrainingBlock } from '../lib/fitUtils';
+import { supabase } from '../lib/supabase';
+import { Session } from '@supabase/supabase-js';
 
 // Definición de Tipos de Entrenamiento
 export const TRAINING_BLOCKS = [
@@ -143,8 +145,26 @@ function DroppableDay({ id, title, assignments, onBlockClick }: { id: string, ti
     );
 }
 
-export function TrainingPlanner({ schedule, setSchedule }: { schedule: Record<string, TrainingBlock[]>, setSchedule: React.Dispatch<React.SetStateAction<Record<string, TrainingBlock[]>>> }) {
+export function TrainingPlanner({ schedule, setSchedule, session }: { schedule: Record<string, TrainingBlock[]>, setSchedule: React.Dispatch<React.SetStateAction<Record<string, TrainingBlock[]>>>, session: Session }) {
     const [selectedBlock, setSelectedBlock] = useState<TrainingBlock | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const saveSchedule = async () => {
+        if (!session) return;
+        setIsSaving(true);
+        try {
+            const { error } = await supabase
+                .from('user_schedules')
+                .upsert({ user_id: session.user.id, schedule_data: schedule });
+
+            if (error) {
+                console.error("Error al guardar el plan:", error);
+                alert("Error al guardar el plan en la nube.");
+            }
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     // Manejar finalización de "soltar"
     const handleDragEnd = (event: DragEndEvent) => {
@@ -175,6 +195,14 @@ export function TrainingPlanner({ schedule, setSchedule }: { schedule: Record<st
                     <p className="text-zinc-400">Construye tu meso-ciclo o pídele a la IA que llene el tablero.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={saveSchedule}
+                        disabled={isSaving}
+                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all border shadow flex items-center gap-2 ${isSaving ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed' : 'bg-garmin-blue hover:bg-blue-600 text-white border-transparent'}`}
+                    >
+                        <Save className="w-4 h-4" />
+                        {isSaving ? 'Guardando...' : 'Guardar Plan'}
+                    </button>
                     <div className="px-4 py-2 bg-zinc-800/50 rounded-lg border border-zinc-700">
                         <p className="text-xs text-zinc-400 uppercase tracking-wider font-semibold">Carga Est. (TSS)</p>
                         <p className="text-xl font-bold font-mono text-amber-400 text-right mt-1">
