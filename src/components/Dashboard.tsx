@@ -130,14 +130,22 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                         if (dataTokens[idxMap.date]) {
                             let dateStr = dataTokens[idxMap.date].replace(/"/g, '').trim();
 
+                            // Fix DD/MM/YYYY into MM/DD/YYYY for native JS parsing
                             const isDDMMYYYY = /^(\d{2})[-/](\d{2})[-/](\d{4})/.test(dateStr);
                             if (isDDMMYYYY) {
-                                dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$3-$2-$1');
+                                dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$2/$1/$3');
                             }
 
-                            dateStr = dateStr.replace(' ', 'T');
+                            // Try to parse the date
+                            let parseDate = new Date(dateStr);
 
-                            const parseDate = new Date(dateStr);
+                            // Si sigue fallando, intentar un parseo agresivo extrayendo números
+                            if (isNaN(parseDate.getTime())) {
+                                const match = dateStr.match(/(\d{2})[-/](\d{2})[-/](\d{4})\s+(\d{1,2}):(\d{2})/);
+                                if (match) {
+                                    parseDate = new Date(`${match[3]}-${match[2]}-${match[1]}T${match[4].padStart(2, '0')}:${match[5]}:00`);
+                                }
+                            }
 
                             if (!isNaN(parseDate.getTime())) {
                                 fecha = parseDate.toISOString();
@@ -145,14 +153,20 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                         }
 
                         let duration_minutes = null;
-                        if (dataTokens[idxMap.duration]) {
-                            const timeParts = dataTokens[idxMap.duration].split(':').map(Number);
-                            if (timeParts.length === 3) {
-                                duration_minutes = Math.round(timeParts[0] * 60 + timeParts[1] + timeParts[2] / 60);
+                        const rawDuration = dataTokens[idxMap.duration] ? dataTokens[idxMap.duration].replace(/"/g, '').trim() : '';
+
+                        if (rawDuration && rawDuration !== '--') {
+                            const timeParts = rawDuration.split(':').map(Number);
+                            if (timeParts.length >= 3) {
+                                // hh:mm:ss o hh:mm:ss.0
+                                duration_minutes = Math.round(timeParts[0] * 60 + timeParts[1] + (timeParts[2] || 0) / 60);
                             } else if (timeParts.length === 2) {
+                                // mm:ss
                                 duration_minutes = Math.round(timeParts[0] + timeParts[1] / 60);
                             }
                         }
+
+                        const rawTiempo = dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--' ? dataTokens[idxMap.duration].replace(/"/g, '').trim() : null;
 
                         const act = {
                             activity_date: fecha,
@@ -160,9 +174,9 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                             calorias: tNum(dataTokens[idxMap.cal], 'integer'),
                             duration_minutes: duration_minutes,
 
-                            tiempo: dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--' ? dataTokens[idxMap.duration] : null,
-                            tiempo_movimiento: dataTokens[30] && dataTokens[30] !== '--' ? dataTokens[30] : null,
-                            tiempo_transcurrido: dataTokens[31] && dataTokens[31] !== '--' ? dataTokens[31] : null,
+                            tiempo: rawTiempo,
+                            tiempo_movimiento: dataTokens[30] && dataTokens[30] !== '--' ? dataTokens[30].replace(/"/g, '').trim() : null,
+                            tiempo_transcurrido: dataTokens[31] && dataTokens[31] !== '--' ? dataTokens[31].replace(/"/g, '').trim() : null,
                             mejor_vuelta: dataTokens[24] && dataTokens[24] !== '--' ? dataTokens[24] : null,
 
                             fc_media: tNum(dataTokens[idxMap.hr_mean], 'integer'),
