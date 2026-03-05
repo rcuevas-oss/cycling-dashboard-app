@@ -46,7 +46,23 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
 
                     // --- NUEVO MAPEO DINÁMICO DE CABECERAS ---
                     const rawHeaders = lines[0].toLowerCase();
-                    const headers = rawHeaders.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.trim().replace(/^"|"$/g, ''));
+
+                    // Detectar el delimitador (, ; o tabulador) basándonos en la primera línea.
+                    let delimiter = ',';
+                    const commaCount = (lines[0].match(/,/g) || []).length;
+                    const semicolonCount = (lines[0].match(/;/g) || []).length;
+                    const tabCount = (lines[0].match(/\t/g) || []).length;
+
+                    if (semicolonCount > commaCount && semicolonCount > tabCount) {
+                        delimiter = ';';
+                    } else if (tabCount > commaCount && tabCount > semicolonCount) {
+                        delimiter = '\t';
+                    }
+
+                    // Crear regex dinámica que respete el delimitador exceptuando cuando está dentro de comillas "".
+                    const splitRegex = new RegExp(`${delimiter}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
+
+                    const headers = rawHeaders.split(splitRegex).map(h => h.trim().replace(/^"|"$/g, ''));
 
                     const findIdx = (keywords: string[], fallback: number) => {
                         const idx = headers.findIndex(h => keywords.some(kw => h.includes(kw)));
@@ -122,7 +138,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                         const line = lines[i].trim();
                         if (!line || line.startsWith('"Tipo de actividad')) continue;
 
-                        const dataTokens = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(t => t.trim().replace(/^"|"$/g, ''));
+                        const dataTokens = line.split(splitRegex).map(t => t.trim().replace(/^"|"$/g, ''));
 
                         if (dataTokens.length < 10) continue;
 
