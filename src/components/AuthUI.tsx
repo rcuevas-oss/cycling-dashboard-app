@@ -13,6 +13,7 @@ export function AuthUI({ onSessionChange }: AuthProps) {
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
 
     // This checks for existing session just like before
     useEffect(() => {
@@ -45,6 +46,9 @@ export function AuthUI({ onSessionChange }: AuthProps) {
                     throw error;
                 }
             } else {
+                if (!acceptedTerms) {
+                    throw new Error('Debes aceptar los Términos y Condiciones del Acceso Anticipado para crear una cuenta.');
+                }
                 const { error } = await supabase.auth.signUp({
                     email,
                     password,
@@ -72,8 +76,8 @@ export function AuthUI({ onSessionChange }: AuthProps) {
                 <button
                     onClick={() => { setIsLoginMode(true); setErrorMsg(null); }}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${isLoginMode
-                            ? 'bg-zinc-800 text-white shadow-md border border-zinc-700/50'
-                            : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                        ? 'bg-zinc-800 text-white shadow-md border border-zinc-700/50'
+                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
                         }`}
                 >
                     Iniciar Sesión
@@ -81,8 +85,8 @@ export function AuthUI({ onSessionChange }: AuthProps) {
                 <button
                     onClick={() => { setIsLoginMode(false); setErrorMsg(null); }}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${!isLoginMode
-                            ? 'bg-zinc-800 text-white shadow-md border border-zinc-700/50'
-                            : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                        ? 'bg-zinc-800 text-white shadow-md border border-zinc-700/50'
+                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
                         }`}
                 >
                     <UserPlus className="w-4 h-4" /> Registrarse
@@ -149,6 +153,22 @@ export function AuthUI({ onSessionChange }: AuthProps) {
                         />
                     </div>
                 </div>
+
+                {!isLoginMode && (
+                    <div className="flex items-start gap-3 mt-4 text-left p-1">
+                        <input
+                            type="checkbox"
+                            id="terms"
+                            required
+                            checked={acceptedTerms}
+                            onChange={(e) => setAcceptedTerms(e.target.checked)}
+                            className="mt-1 w-4 h-4 rounded border-zinc-700 bg-zinc-900/50 text-garmin-blue focus:ring-garmin-blue focus:ring-offset-zinc-900"
+                        />
+                        <label htmlFor="terms" className="text-xs text-zinc-400 leading-relaxed">
+                            He leído y acepto los <a href="#terms" className="text-garmin-blue hover:underline">Términos y Condiciones</a> del <strong>Acceso Anticipado</strong>. Entiendo que la plataforma se encuentra en fase de piloto de producción.
+                        </label>
+                    </div>
+                )}
 
                 <button
                     type="submit"
