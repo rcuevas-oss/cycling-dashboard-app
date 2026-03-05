@@ -8,6 +8,7 @@ import { AICoachModal } from './components/AICoachModal'
 import { AICoachPanel } from './components/AICoachPanel'
 import { LandingPage } from './components/LandingPage'
 import { Bot, User, LogOut, ChevronDown } from 'lucide-react'
+import { SiGithub } from 'react-icons/si'
 import { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { TrainingBlock } from './lib/fitUtils'
@@ -100,7 +101,7 @@ export default function App() {
                             ← Volver
                         </button>
                         <div className="w-16 h-16 bg-garmin-blue/20 text-garmin-blue rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 3.5 0 0 0 0 7h5a3.5 3.5 3.5 0 0 1 0 7H6" /></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
                         </div>
                         <h1 className="text-3xl font-bold tracking-tight">
                             Cycling <span className="gradient-text">AI Trainer</span>
@@ -122,7 +123,17 @@ export default function App() {
                         </div>
 
                         {/* Menú de Usuario Compacto */}
-                        <div className="relative">
+                        <div className="relative flex items-center gap-4">
+                            <a
+                                href="https://github.com/rcuevas-oss"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-zinc-500 hover:text-white transition-colors"
+                                title="Código Fuente - GitHub"
+                            >
+                                <SiGithub className="w-5 h-5" />
+                            </a>
+
                             <button
                                 onClick={() => setShowUserMenu(!showUserMenu)}
                                 className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 hover:bg-zinc-800 rounded-full border border-zinc-700/50 transition-colors"

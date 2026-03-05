@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight, Activity, Brain, LineChart, Cpu, Zap, Shield, Menu, X, ChevronRight } from 'lucide-react'
-import { SiGarmin, SiSupabase, SiReact, SiTailwindcss, SiTypescript, SiOpenai, SiGithub } from 'react-icons/si'
+import { SiGarmin, SiSupabase, SiReact, SiTailwindcss, SiTypescript, SiOpenai } from 'react-icons/si'
 
 interface LandingPageProps {
     onGetStarted: () => void;
@@ -55,16 +55,6 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
 
                     {/* Right Side: Start Button & Mobile Toggle */}
                     <div className="flex items-center gap-4">
-                        <a
-                            href="https://github.com/rcuevas-oss"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hidden md:flex text-zinc-400 hover:text-white transition-colors"
-                            title="GitHub"
-                        >
-                            <SiGithub className="w-5 h-5" />
-                        </a>
-
                         <button
                             onClick={onGetStarted}
                             className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-white text-black text-sm font-bold rounded-xl transition-all hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.2)]"
@@ -94,17 +84,6 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                         <button onClick={() => scrollToSection('about')} className="flex items-center justify-between py-3 text-left text-zinc-300 font-medium border-b border-white/5">
                             Quiénes Somos <ChevronRight className="w-4 h-4 opacity-50" />
                         </button>
-                        <a
-                            href="https://github.com/rcuevas-oss"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between py-3 text-left text-zinc-300 font-medium border-b border-white/5"
-                        >
-                            <span className="flex items-center gap-3">
-                                <SiGithub className="w-5 h-5" /> GitHub
-                            </span>
-                            <ChevronRight className="w-4 h-4 opacity-50" />
-                        </a>
                         <button onClick={onGetStarted} className="mt-2 w-full flex items-center justify-center gap-2 px-5 py-4 bg-garmin-blue text-white text-sm font-bold rounded-xl shadow-[0_0_20px_rgba(0,124,195,0.3)]">
                             Iniciar Sesión <ArrowRight className="w-4 h-4" />
                         </button>
