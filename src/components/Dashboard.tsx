@@ -57,24 +57,24 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                         date: findIdx(['fecha', 'date', 'tiempo', 'time'], 1),
                         duration: findIdx(['tiempo', 'time', 'duración', 'duration'], 6),
                         dist: findIdx(['distancia', 'distance'], 4),
-                        cal: findIdx(['calor', 'calorie'], 5),
-                        hr_mean: findIdx(['fc media', 'avg hr', 'mean hr'], 12),
-                        hr_max: findIdx(['fc máx', 'max hr'], 13),
+                        cal: findIdx(['calor', 'calorie'], 5), // calor matches CalorÃ­as
+                        hr_mean: findIdx(['fc media', 'avg hr', 'mean hr', 'frecuencia card'], 12), // frecuencia card matches Frecuencia cardÃ­aca
+                        hr_max: findIdx(['fc max', 'max hr'], 13), // fails accent -> fallback 13
                         cad_mean: findIdx(['cadencia media', 'avg cadence'], 14),
-                        cad_max: findIdx(['cadencia máxima', 'max cadence'], 15),
+                        cad_max: findIdx(['cadencia m', 'max cadence'], 15),
                         np: findIdx(['np', 'potencia normalizada', 'normalized power'], 16),
                         tss: findIdx(['tss', 'training stress score'], 17),
                         p20: findIdx(['20 min', '20min'], 18),
                         p_mean: findIdx(['potencia media', 'avg power'], 19),
-                        p_max: findIdx(['potencia máxima', 'max power'], 20),
+                        p_max: findIdx(['potencia m', 'max power'], 20),
                         strokes: findIdx(['pedaladas', 'strokes'], 21),
-                        temp_min: findIdx(['temp. mín', 'min temp'], 22),
+                        temp_min: findIdx(['temp. min', 'min temp'], 22),
                         descompresion: findIdx(['descompresi'], 23),
                         laps: findIdx(['vueltas', 'laps'], 25),
-                        temp_max: findIdx(['temp. máx', 'max temp'], 26),
+                        temp_max: findIdx(['temp. max', 'max temp'], 26),
                         resp_mean: findIdx(['resp. media', 'avg resp'], 27),
-                        resp_min: findIdx(['resp. mín', 'min resp'], 28),
-                        resp_max: findIdx(['resp. máx', 'max resp'], 29),
+                        resp_min: findIdx(['resp. m', 'min resp'], 28),
+                        resp_max: findIdx(['resp. m', 'max resp'], 29),
                     };
 
                     const tNum = (val: string | undefined, metricType: 'auto' | 'decimal' | 'integer' = 'auto') => {
@@ -83,18 +83,28 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                         let cleaned = val.replace(/^"|"$/g, '').trim();
                         if (cleaned === '') return null;
 
-                        if (cleaned.includes(',') && cleaned.includes('.')) {
-                            if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
-                                cleaned = cleaned.replace(/,/g, '');
+                        if (metricType === 'integer') {
+                            // "1.016" -> "1016" (Spain thousands), "1,244" -> "1244" (US thousands)
+                            cleaned = cleaned.replace(/[,.]/g, '');
+                        } else if (metricType === 'decimal') {
+                            if (cleaned.includes(',') && cleaned.includes('.')) {
+                                if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
+                                    cleaned = cleaned.replace(/,/g, '');
+                                } else {
+                                    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+                                }
                             } else {
-                                cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-                            }
-                        } else if (cleaned.includes(',')) {
-                            if (metricType === 'integer') {
-                                cleaned = cleaned.replace(/,/g, '');
-                            } else if (metricType === 'decimal') {
+                                // "36,36" -> "36.36" or "36.36" -> "36.36"
                                 cleaned = cleaned.replace(',', '.');
-                            } else {
+                            }
+                        } else {
+                            if (cleaned.includes(',') && cleaned.includes('.')) {
+                                if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
+                                    cleaned = cleaned.replace(/,/g, '');
+                                } else {
+                                    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+                                }
+                            } else if (cleaned.includes(',')) {
                                 if (/,\d{3}$/.test(cleaned) && cleaned.length >= 5) {
                                     cleaned = cleaned.replace(/,/g, '');
                                 } else {
@@ -110,7 +120,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                     // Iterar por todas las líneas saltando la cabecera
                     for (let i = 1; i < lines.length; i++) {
                         const line = lines[i].trim();
-                        if (!line) continue;
+                        if (!line || line.startsWith('"Tipo de actividad')) continue;
 
                         const dataTokens = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(t => t.trim().replace(/^"|"$/g, ''));
 
