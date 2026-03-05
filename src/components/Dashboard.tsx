@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import Papa from 'papaparse';
 import { Session } from '@supabase/supabase-js';
 
 export function Dashboard({ session, activities, onDataChanged }: { session: Session, activities: any[], onDataChanged: () => Promise<void> }) {
@@ -39,74 +40,11 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                     const text = event.target?.result as string;
                     if (!text) return resolve([]);
 
-                    const lines = text.split('\n');
-                    if (lines.length < 2) return resolve([]);
+                    // Helper para parsear números con manejo de formatos regionales
+                    const tNum = (value: string | undefined, metricType: 'integer' | 'decimal') => {
+                        if (value === undefined || value === null || value.trim() === '' || value === '--') return null;
+                        let cleaned = value.toString().replace(/"/g, '').trim();
 
-                    const activitiesToInsert = [];
-
-                    // --- NUEVO MAPEO DINÁMICO DE CABECERAS ---
-                    const rawHeaders = lines[0].toLowerCase();
-
-                    // Detectar el delimitador (, ; o tabulador) basándonos en la primera línea.
-                    let delimiter = ',';
-                    const commaCount = (lines[0].match(/,/g) || []).length;
-                    const semicolonCount = (lines[0].match(/;/g) || []).length;
-                    const tabCount = (lines[0].match(/\t/g) || []).length;
-
-                    if (semicolonCount > commaCount && semicolonCount > tabCount) {
-                        delimiter = ';';
-                    } else if (tabCount > commaCount && tabCount > semicolonCount) {
-                        delimiter = '\t';
-                    }
-
-                    // Crear regex dinámica que respete el delimitador exceptuando cuando está dentro de comillas "".
-                    const splitRegex = new RegExp(`${delimiter}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
-
-                    const headers = rawHeaders.split(splitRegex).map(h => h.trim().replace(/^"|"$/g, ''));
-
-                    const findIdx = (keywords: string[], fallback: number) => {
-                        const idx = headers.findIndex(h => keywords.some(kw => h.includes(kw)));
-                        return idx === -1 ? fallback : idx;
-                    };
-
-                    const idxMap: Record<string, number> = {
-                        date: findIdx(['fecha', 'date', 'tiempo', 'time'], 1),
-                        duration: findIdx(['tiempo', 'time', 'duración', 'duration'], 6),
-                        dist: findIdx(['distancia', 'distance'], 4),
-                        cal: findIdx(['calor', 'calorie'], 5),
-                        hr_mean: findIdx(['fc media', 'avg hr', 'mean hr', 'frecuencia card'], 12),
-                        hr_max: findIdx(['fc m', 'fc max', 'max hr'], 13),
-                        cad_mean: findIdx(['cadencia media', 'avg cadence'], 14),
-                        cad_max: findIdx(['cadencia m', 'max cadence'], 15),
-                        np: findIdx(['np', 'potencia normalizada', 'normalized power'], 16),
-                        tss: findIdx(['tss', 'training stress score'], 17),
-                        p20: findIdx(['20 min', '20min'], 18),
-                        p_mean: findIdx(['potencia media', 'avg power'], 19),
-                        p_max: findIdx(['potencia m', 'max power'], 20),
-                        strokes: findIdx(['pedaladas', 'strokes'], 21),
-                        temp_min: findIdx(['temp. min', 'temp. mín', 'min temp'], 22),
-                        descompresion: findIdx(['descompresi'], 23),
-                        laps: findIdx(['vueltas', 'laps'], 25),
-                        temp_max: findIdx(['temp. max', 'temp. máx', 'max temp'], 26),
-                        resp_mean: findIdx(['resp. media', 'avg resp'], 27),
-                        resp_min: findIdx(['resp. min', 'resp. mín', 'min resp'], 28),
-                        resp_max: findIdx(['resp. max', 'resp. máx', 'max resp'], 29),
-                        t_mov: findIdx(['tiempo en movimiento', 'moving time', 'tiempo mov'], 30),
-                        t_transcur: findIdx(['tiempo transcurrido', 'elapsed time'], 31),
-                        lap_best: findIdx(['mejor vuelta', 'best lap'], 24),
-                        te_aer: findIdx(['te aer', 'aerobic te'], 9),
-                        vel_mean: findIdx(['velocidad media', 'avg speed'], 10),
-                        vel_max: findIdx(['velocidad m', 'max speed'], 11),
-                        asc_tot: findIdx(['ascenso', 'elev gain', 'total ascent'], 12),
-                        desc_tot: findIdx(['descenso', 'elev loss', 'total descent'], 13),
-                        alt_min: findIdx(['altura min', 'altura mín', 'min elev'], 32),
-                        alt_max: findIdx(['altura max', 'altura máx', 'max elev'], 33),
-                    };
-
-                    const tNum = (val: string | undefined, metricType: 'auto' | 'decimal' | 'integer' = 'auto') => {
-                        if (!val || val === '--' || val === '') return null;
-
-                        let cleaned = val.replace(/^"|"$/g, '').trim();
                         if (cleaned === '') return null;
 
                         if (metricType === 'integer') {
@@ -123,7 +61,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                                 // "36,36" -> "36.36" or "36.36" -> "36.36"
                                 cleaned = cleaned.replace(',', '.');
                             }
-                        } else {
+                        } else { // This 'else' branch seems to be a fallback for 'decimal' or a more general case
                             if (cleaned.includes(',') && cleaned.includes('.')) {
                                 if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
                                     cleaned = cleaned.replace(/,/g, '');
@@ -141,112 +79,163 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
 
                         const num = Number(cleaned);
                         return isNaN(num) ? null : num;
-                    }
+                    };
 
-                    // Iterar por todas las líneas saltando la cabecera
-                    for (let i = 1; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (!line || line.startsWith('"Tipo de actividad')) continue;
+                    // PapaParse procesa el texto puro manejando delimitadores y comillas internas correctamente
+                    Papa.parse(text, {
+                        header: false, // No hay encabezado en la primera fila de datos
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                            const activitiesToInsert: any[] = [];
 
-                        const dataTokens = line.split(splitRegex).map(t => t.trim().replace(/^"|"$/g, ''));
+                            // Mapeo dinámico y difuso (fuzzy) de cabeceras para múltiples idiomas y formatos de exportación
+                            const headerRow = results.data[0] as string[];
+                            const hLower = headerRow.map(h => h ? h.toString().toLowerCase() : '');
+                            const findFuzzy = (keywords: string[]) => hLower.findIndex(h => keywords.some(k => h.includes(k)));
 
-                        if (dataTokens.length < 10) continue;
+                            const idxMap: { [key: string]: number | undefined } = {
+                                title: findFuzzy(['título', 'title']),
+                                date: findFuzzy(['fecha', 'date', 'tiempo', 'time']),
+                                dist: findFuzzy(['distancia', 'distance']),
+                                cal: findFuzzy(['calor', 'calorie']),
+                                duration: findFuzzy(['tiempo', 'time', 'duración', 'duration']),
+                                t_mov: findFuzzy(['tiempo en movimiento', 'moving time', 'tiempo mov']),
+                                t_transcur: findFuzzy(['tiempo transcurrido', 'elapsed time']),
+                                lap_best: findFuzzy(['mejor vuelta', 'best lap']),
+                                hr_mean: findFuzzy(['fc media', 'avg hr', 'mean hr', 'frecuencia card', 'frecuencia cardiaca media']),
+                                hr_max: findFuzzy(['fc m', 'fc max', 'max hr', 'frecuencia cardiaca max']),
+                                te_aer: findFuzzy(['te aer', 'aerobic te']),
+                                vel_mean: findFuzzy(['velocidad media', 'avg speed', 'vel media']),
+                                vel_max: findFuzzy(['velocidad m', 'max speed', 'vel max']),
+                                asc_tot: findFuzzy(['ascenso', 'elev gain', 'total ascent']),
+                                desc_tot: findFuzzy(['descenso', 'elev loss', 'total descent']),
+                                alt_min: findFuzzy(['altura min', 'altura mín', 'min elev']),
+                                alt_max: findFuzzy(['altura max', 'altura máx', 'max elev']),
+                                cad_mean: findFuzzy(['cadencia media', 'avg cadence', 'cad media']),
+                                cad_max: findFuzzy(['cadencia m', 'max cadence', 'cad max']),
+                                np: findFuzzy(['np', 'potencia normalizada', 'normalized power']),
+                                tss: findFuzzy(['tss', 'training stress score']),
+                                p20: findFuzzy(['20 min', '20min', 'potencia maxima 20']),
+                                p_mean: findFuzzy(['potencia media', 'avg power']),
+                                p_max: findFuzzy(['potencia m', 'max power']),
+                                strokes: findFuzzy(['pedaladas', 'strokes']),
+                                temp_min: findFuzzy(['temp. min', 'temp. mín', 'min temp', 'temperatura min']),
+                                descompresion: findFuzzy(['descompresi']),
+                                laps: findFuzzy(['vueltas', 'laps']),
+                                temp_max: findFuzzy(['temp. max', 'temp. máx', 'max temp', 'temperatura max']),
+                                resp_mean: findFuzzy(['resp. media', 'avg resp', 'respiracion media']),
+                                resp_min: findFuzzy(['resp. min', 'resp. mín', 'min resp', 'respiracion min']),
+                                resp_max: findFuzzy(['resp. max', 'resp. máx', 'max resp', 'respiracion max']),
+                            };
 
-                        let fecha = null;
-                        if (dataTokens[idxMap.date]) {
-                            let dateStr = dataTokens[idxMap.date].replace(/"/g, '').trim();
+                            // Limpiar índices que devuelven -1 (no encontrados)
+                            Object.keys(idxMap).forEach(k => { if (idxMap[k] === -1) idxMap[k] = undefined; });
 
-                            // Fix DD/MM/YYYY into MM/DD/YYYY for native JS parsing
-                            const isDDMMYYYY = /^(\d{2})[-/](\d{2})[-/](\d{4})/.test(dateStr);
-                            if (isDDMMYYYY) {
-                                dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$2/$1/$3');
-                            }
+                            // Iterar por todas las filas usando el parser oficial
+                            for (let i = 1; i < results.data.length; i++) {
+                                const dataTokens = results.data[i] as string[];
 
-                            // Try to parse the date
-                            let parseDate = new Date(dateStr);
+                                // Ignorar filas totalmente vacías o que comiencen con las etiquetas ignoradas de archivo Garmin
+                                if (!dataTokens || dataTokens.length < 10) continue;
+                                if (dataTokens[0] && typeof dataTokens[0] === 'string' && dataTokens[0].startsWith('Tipo de actividad')) continue;
 
-                            // Si sigue fallando, intentar un parseo agresivo extrayendo números
-                            if (isNaN(parseDate.getTime())) {
-                                const match = dateStr.match(/(\d{2})[-/](\d{2})[-/](\d{4})\s+(\d{1,2}):(\d{2})/);
-                                if (match) {
-                                    parseDate = new Date(`${match[3]}-${match[2]}-${match[1]}T${match[4].padStart(2, '0')}:${match[5]}:00`);
+                                let fecha = null;
+                                if (idxMap.date !== undefined && dataTokens[idxMap.date]) {
+                                    let dateStr = dataTokens[idxMap.date].toString().replace(/"/g, '').trim();
+
+                                    // Fix DD/MM/YYYY into MM/DD/YYYY for native JS parsing
+                                    const isDDMMYYYY = /^(\d{2})[-/](\d{2})[-/](\d{4})/.test(dateStr);
+                                    if (isDDMMYYYY) {
+                                        dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$2/$1/$3');
+                                    }
+
+                                    // Try to parse the date
+                                    let parseDate = new Date(dateStr);
+
+                                    // Si sigue fallando, intentar un parseo agresivo extrayendo números
+                                    if (isNaN(parseDate.getTime())) {
+                                        const match = dateStr.match(/(\d{2})[-/](\d{2})[-/](\d{4})\s+(\d{1,2}):(\d{2})/);
+                                        if (match) {
+                                            parseDate = new Date(`${match[3]}-${match[2]}-${match[1]}T${match[4].padStart(2, '0')}:${match[5]}:00`);
+                                        }
+                                    }
+
+                                    if (!isNaN(parseDate.getTime())) {
+                                        fecha = parseDate.toISOString();
+                                    }
+                                }
+
+                                let duration_minutes = null;
+                                const rawDuration = (idxMap.duration !== undefined && dataTokens[idxMap.duration]) ? dataTokens[idxMap.duration].toString().replace(/"/g, '').trim() : '';
+
+                                if (rawDuration && rawDuration !== '--') {
+                                    const timeParts = rawDuration.split(':').map(Number);
+                                    if (timeParts.length >= 3) {
+                                        // hh:mm:ss o hh:mm:ss.0
+                                        duration_minutes = Math.round(timeParts[0] * 60 + timeParts[1] + (timeParts[2] || 0) / 60);
+                                    } else if (timeParts.length === 2) {
+                                        // mm:ss
+                                        duration_minutes = Math.round(timeParts[0] + timeParts[1] / 60);
+                                    }
+                                }
+
+                                const rawTiempo = (idxMap.duration !== undefined && dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--') ? dataTokens[idxMap.duration].toString().replace(/"/g, '').trim() : null;
+
+                                const act = {
+                                    titulo: (idxMap.title !== undefined && dataTokens[idxMap.title]) ? dataTokens[idxMap.title].toString().replace(/"/g, '').trim() : null,
+                                    activity_date: fecha,
+                                    distance_km: tNum(idxMap.dist !== undefined ? dataTokens[idxMap.dist]?.toString() : undefined, 'decimal'),
+                                    calorias: tNum(idxMap.cal !== undefined ? dataTokens[idxMap.cal]?.toString() : undefined, 'integer'),
+                                    duration_minutes: duration_minutes,
+
+                                    tiempo: rawTiempo,
+                                    tiempo_movimiento: (idxMap.t_mov !== undefined && dataTokens[idxMap.t_mov] && dataTokens[idxMap.t_mov] !== '--') ? dataTokens[idxMap.t_mov].toString().replace(/"/g, '').trim() : null,
+                                    tiempo_transcurrido: (idxMap.t_transcur !== undefined && dataTokens[idxMap.t_transcur] && dataTokens[idxMap.t_transcur] !== '--') ? dataTokens[idxMap.t_transcur].toString().replace(/"/g, '').trim() : null,
+                                    mejor_vuelta: (idxMap.lap_best !== undefined && dataTokens[idxMap.lap_best] && dataTokens[idxMap.lap_best] !== '--') ? dataTokens[idxMap.lap_best].toString().replace(/"/g, '').trim() : null,
+
+                                    fc_media: tNum(idxMap.hr_mean !== undefined ? dataTokens[idxMap.hr_mean]?.toString() : undefined, 'integer'),
+                                    fc_maxima: tNum(idxMap.hr_max !== undefined ? dataTokens[idxMap.hr_max]?.toString() : undefined, 'integer'),
+                                    te_aerobico: tNum(idxMap.te_aer !== undefined ? dataTokens[idxMap.te_aer]?.toString() : undefined, 'decimal'),
+                                    velocidad_media: tNum(idxMap.vel_mean !== undefined ? dataTokens[idxMap.vel_mean]?.toString() : undefined, 'decimal'),
+                                    velocidad_maxima: tNum(idxMap.vel_max !== undefined ? dataTokens[idxMap.vel_max]?.toString() : undefined, 'decimal'),
+                                    ascenso_total: tNum(idxMap.asc_tot !== undefined ? dataTokens[idxMap.asc_tot]?.toString() : undefined, 'integer'),
+                                    descenso_total: tNum(idxMap.desc_tot !== undefined ? dataTokens[idxMap.desc_tot]?.toString() : undefined, 'integer'),
+                                    altura_min: tNum(idxMap.alt_min !== undefined ? dataTokens[idxMap.alt_min]?.toString() : undefined, 'integer'),
+                                    altura_max: tNum(idxMap.alt_max !== undefined ? dataTokens[idxMap.alt_max]?.toString() : undefined, 'integer'),
+
+                                    cadencia_media: tNum(idxMap.cad_mean !== undefined ? dataTokens[idxMap.cad_mean]?.toString() : undefined, 'integer'),
+                                    cadencia_maxima: tNum(idxMap.cad_max !== undefined ? dataTokens[idxMap.cad_max]?.toString() : undefined, 'integer'),
+
+                                    normalized_power: tNum(idxMap.np !== undefined ? dataTokens[idxMap.np]?.toString() : undefined, 'integer'),
+                                    training_stress_score: tNum(idxMap.tss !== undefined ? dataTokens[idxMap.tss]?.toString() : undefined, 'decimal'),
+                                    potencia_20min: tNum(idxMap.p20 !== undefined ? dataTokens[idxMap.p20]?.toString() : undefined, 'integer'),
+                                    potencia_media: tNum(idxMap.p_mean !== undefined ? dataTokens[idxMap.p_mean]?.toString() : undefined, 'integer'),
+                                    potencia_maxima: tNum(idxMap.p_max !== undefined ? dataTokens[idxMap.p_max]?.toString() : undefined, 'integer'),
+                                    pedaladas_totales: tNum(idxMap.strokes !== undefined ? dataTokens[idxMap.strokes]?.toString() : undefined, 'integer'),
+
+                                    temperatura_min: tNum(idxMap.temp_min !== undefined ? dataTokens[idxMap.temp_min]?.toString() : undefined, 'decimal'),
+                                    descompresion: (idxMap.descompresion !== undefined && dataTokens[idxMap.descompresion] && dataTokens[idxMap.descompresion] !== '--') ? dataTokens[idxMap.descompresion].toString() : null,
+                                    numero_vueltas: tNum(idxMap.laps !== undefined ? dataTokens[idxMap.laps]?.toString() : undefined, 'integer'),
+                                    temperatura_max: tNum(idxMap.temp_max !== undefined ? dataTokens[idxMap.temp_max]?.toString() : undefined, 'decimal'),
+                                    resp_media: tNum(idxMap.resp_mean !== undefined ? dataTokens[idxMap.resp_mean]?.toString() : undefined, 'integer'),
+                                    resp_min: tNum(idxMap.resp_min !== undefined ? dataTokens[idxMap.resp_min]?.toString() : undefined, 'integer'),
+                                    resp_max: tNum(idxMap.resp_max !== undefined ? dataTokens[idxMap.resp_max]?.toString() : undefined, 'integer'),
+                                };
+
+                                Object.keys(act).forEach(key => {
+                                    if ((act as any)[key] === null) {
+                                        delete (act as any)[key];
+                                    }
+                                });
+
+                                if (act.distance_km !== undefined) {
+                                    activitiesToInsert.push(act);
                                 }
                             }
 
-                            if (!isNaN(parseDate.getTime())) {
-                                fecha = parseDate.toISOString();
-                            }
+                            resolve(activitiesToInsert);
                         }
-
-                        let duration_minutes = null;
-                        const rawDuration = dataTokens[idxMap.duration] ? dataTokens[idxMap.duration].replace(/"/g, '').trim() : '';
-
-                        if (rawDuration && rawDuration !== '--') {
-                            const timeParts = rawDuration.split(':').map(Number);
-                            if (timeParts.length >= 3) {
-                                // hh:mm:ss o hh:mm:ss.0
-                                duration_minutes = Math.round(timeParts[0] * 60 + timeParts[1] + (timeParts[2] || 0) / 60);
-                            } else if (timeParts.length === 2) {
-                                // mm:ss
-                                duration_minutes = Math.round(timeParts[0] + timeParts[1] / 60);
-                            }
-                        }
-
-                        const rawTiempo = dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--' ? dataTokens[idxMap.duration].replace(/"/g, '').trim() : null;
-
-                        const act = {
-                            activity_date: fecha,
-                            distance_km: tNum(dataTokens[idxMap.dist], 'decimal'),
-                            calorias: tNum(dataTokens[idxMap.cal], 'integer'),
-                            duration_minutes: duration_minutes,
-
-                            tiempo: rawTiempo,
-                            tiempo_movimiento: dataTokens[idxMap.t_mov] && dataTokens[idxMap.t_mov] !== '--' ? dataTokens[idxMap.t_mov].replace(/"/g, '').trim() : null,
-                            tiempo_transcurrido: dataTokens[idxMap.t_transcur] && dataTokens[idxMap.t_transcur] !== '--' ? dataTokens[idxMap.t_transcur].replace(/"/g, '').trim() : null,
-                            mejor_vuelta: dataTokens[idxMap.lap_best] && dataTokens[idxMap.lap_best] !== '--' ? dataTokens[idxMap.lap_best].replace(/"/g, '').trim() : null,
-
-                            fc_media: tNum(dataTokens[idxMap.hr_mean], 'integer'),
-                            fc_maxima: tNum(dataTokens[idxMap.hr_max], 'integer'),
-                            te_aerobico: tNum(dataTokens[idxMap.te_aer], 'decimal'),
-                            velocidad_media: tNum(dataTokens[idxMap.vel_mean], 'decimal'),
-                            velocidad_maxima: tNum(dataTokens[idxMap.vel_max], 'decimal'),
-                            ascenso_total: tNum(dataTokens[idxMap.asc_tot], 'integer'),
-                            descenso_total: tNum(dataTokens[idxMap.desc_tot], 'integer'),
-                            altura_min: tNum(dataTokens[idxMap.alt_min], 'integer'),
-                            altura_max: tNum(dataTokens[idxMap.alt_max], 'integer'),
-
-                            cadencia_media: tNum(dataTokens[idxMap.cad_mean], 'integer'),
-                            cadencia_maxima: tNum(dataTokens[idxMap.cad_max], 'integer'),
-
-                            normalized_power: tNum(dataTokens[idxMap.np], 'integer'),
-                            training_stress_score: tNum(dataTokens[idxMap.tss], 'integer'),
-                            potencia_20min: tNum(dataTokens[idxMap.p20], 'integer'),
-                            potencia_media: tNum(dataTokens[idxMap.p_mean], 'integer'),
-                            potencia_maxima: tNum(dataTokens[idxMap.p_max], 'integer'),
-                            pedaladas_totales: tNum(dataTokens[idxMap.strokes], 'integer'),
-
-                            temperatura_min: tNum(dataTokens[idxMap.temp_min], 'decimal'),
-                            descompresion: dataTokens[idxMap.descompresion] && dataTokens[idxMap.descompresion] !== '--' ? dataTokens[idxMap.descompresion] : null,
-                            numero_vueltas: tNum(dataTokens[idxMap.laps], 'integer'),
-                            temperatura_max: tNum(dataTokens[idxMap.temp_max], 'decimal'),
-                            resp_media: tNum(dataTokens[idxMap.resp_mean], 'integer'),
-                            resp_min: tNum(dataTokens[idxMap.resp_min], 'integer'),
-                            resp_max: tNum(dataTokens[idxMap.resp_max], 'integer'),
-                        };
-
-                        Object.keys(act).forEach(key => {
-                            if ((act as any)[key] === null) {
-                                delete (act as any)[key];
-                            }
-                        });
-
-
-                        if (act.distance_km !== undefined) {
-                            activitiesToInsert.push(act);
-                        }
-                    }
-
-                    resolve(activitiesToInsert);
+                    });
                 } catch (err) {
                     console.error("Error parseando CSV:", err);
                     resolve([]);
