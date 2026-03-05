@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight, Activity, Brain, LineChart, Cpu, Zap, Shield, Menu, X, ChevronRight } from 'lucide-react'
-import { SiGarmin, SiSupabase, SiReact, SiTailwindcss, SiTypescript, SiOpenai } from 'react-icons/si'
+import { SiGarmin, SiSupabase, SiReact, SiTailwindcss, SiTypescript, SiOpenai, SiGithub } from 'react-icons/si'
 
 interface LandingPageProps {
     onGetStarted: () => void;
@@ -341,7 +341,18 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                     <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center mb-6 border border-white/10">
                         <Activity className="w-5 h-5 text-garmin-blue" />
                     </div>
-                    <p className="text-zinc-500 text-sm mb-2">Desarrollado para ciclistas que aman los datos.</p>
+                    <p className="text-zinc-500 text-sm mb-4">Desarrollado para ciclistas que aman los datos.</p>
+
+                    <a
+                        href="https://github.com/rcuevas-oss"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 mb-6 px-4 py-2 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all hover:scale-105"
+                    >
+                        <SiGithub className="w-5 h-5" />
+                        <span className="text-sm font-medium">rcuevas-oss</span>
+                    </a>
+
                     <p className="text-zinc-600 text-xs">© 2026 Cycling AI Trainer. Todos los derechos reservados.</p>
                 </div>
             </footer>
