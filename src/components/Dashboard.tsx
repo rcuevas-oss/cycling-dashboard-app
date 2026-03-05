@@ -44,31 +44,65 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
 
                     const activitiesToInsert = [];
 
-                    const tNum = (val: string, _isInt = false) => {
+                    // --- NUEVO MAPEO DINÁMICO DE CABECERAS ---
+                    const rawHeaders = lines[0].toLowerCase();
+                    const headers = rawHeaders.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.trim().replace(/^"|"$/g, ''));
+
+                    const findIdx = (keywords: string[], fallback: number) => {
+                        const idx = headers.findIndex(h => keywords.some(kw => h.includes(kw)));
+                        return idx === -1 ? fallback : idx;
+                    };
+
+                    const idxMap: Record<string, number> = {
+                        date: findIdx(['fecha', 'date', 'tiempo', 'time'], 1),
+                        duration: findIdx(['tiempo', 'time', 'duración', 'duration'], 6),
+                        dist: findIdx(['distancia', 'distance'], 4),
+                        cal: findIdx(['calor', 'calorie'], 5),
+                        hr_mean: findIdx(['fc media', 'avg hr', 'mean hr'], 12),
+                        hr_max: findIdx(['fc máx', 'max hr'], 13),
+                        cad_mean: findIdx(['cadencia media', 'avg cadence'], 14),
+                        cad_max: findIdx(['cadencia máxima', 'max cadence'], 15),
+                        np: findIdx(['np', 'potencia normalizada', 'normalized power'], 16),
+                        tss: findIdx(['tss', 'training stress score'], 17),
+                        p20: findIdx(['20 min', '20min'], 18),
+                        p_mean: findIdx(['potencia media', 'avg power'], 19),
+                        p_max: findIdx(['potencia máxima', 'max power'], 20),
+                        strokes: findIdx(['pedaladas', 'strokes'], 21),
+                        temp_min: findIdx(['temp. mín', 'min temp'], 22),
+                        descompresion: findIdx(['descompresi'], 23),
+                        laps: findIdx(['vueltas', 'laps'], 25),
+                        temp_max: findIdx(['temp. máx', 'max temp'], 26),
+                        resp_mean: findIdx(['resp. media', 'avg resp'], 27),
+                        resp_min: findIdx(['resp. mín', 'min resp'], 28),
+                        resp_max: findIdx(['resp. máx', 'max resp'], 29),
+                    };
+
+                    const tNum = (val: string | undefined, metricType: 'auto' | 'decimal' | 'integer' = 'auto') => {
                         if (!val || val === '--' || val === '') return null;
 
-                        // Quitamos comillas si Garmin las envolvió (ej: `"145"`)
                         let cleaned = val.replace(/^"|"$/g, '').trim();
                         if (cleaned === '') return null;
 
-                        // Regla maestra de limpieza numérica pro (Soporta formatos USA y EU)
                         if (cleaned.includes(',') && cleaned.includes('.')) {
                             if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
-                                cleaned = cleaned.replace(/,/g, ''); // USA: 1,234.56 -> 1234.56
+                                cleaned = cleaned.replace(/,/g, '');
                             } else {
-                                cleaned = cleaned.replace(/\./g, '').replace(',', '.'); // EU: 1.234,56 -> 1234.56
+                                cleaned = cleaned.replace(/\./g, '').replace(',', '.');
                             }
                         } else if (cleaned.includes(',')) {
-                            // Tiene coma pero no punto. Garmin exporta miles como "1,244". 
-                            // Si tiene 3 dígitos tras la coma, asumimos que es separador de miles.
-                            if (/,\d{3}$/.test(cleaned) && cleaned.length >= 5) {
-                                cleaned = cleaned.replace(/,/g, ''); // 1,244 -> 1244
+                            if (metricType === 'integer') {
+                                cleaned = cleaned.replace(/,/g, '');
+                            } else if (metricType === 'decimal') {
+                                cleaned = cleaned.replace(',', '.');
                             } else {
-                                cleaned = cleaned.replace(',', '.'); // 15,5 -> 15.5
+                                if (/,\d{3}$/.test(cleaned) && cleaned.length >= 5) {
+                                    cleaned = cleaned.replace(/,/g, '');
+                                } else {
+                                    cleaned = cleaned.replace(',', '.');
+                                }
                             }
                         }
 
-                        // Parsear explícitamente a Número de Javascript antes de enviarlo a PostgreSQL
                         const num = Number(cleaned);
                         return isNaN(num) ? null : num;
                     }
@@ -78,39 +112,31 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                         const line = lines[i].trim();
                         if (!line) continue;
 
-                        // Separar por comas respetando comillas
                         const dataTokens = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(t => t.trim().replace(/^"|"$/g, ''));
 
-                        // Validar si la fila tiene la longitud esperada para este nuevo formato (61 columnas aprox)
                         if (dataTokens.length < 10) continue;
 
                         let fecha = null;
-                        if (dataTokens[1]) {
-                            // Garmin Chile suele devolver "DD-MM-YYYY HH:mm:ss" pero a veces "YYYY-MM-DD HH:mm:ss"
-                            let dateStr = dataTokens[1].replace(/"/g, '').trim();
+                        if (dataTokens[idxMap.date]) {
+                            let dateStr = dataTokens[idxMap.date].replace(/"/g, '').trim();
 
-                            // Si detecta DD-MM-YYYY o DD/MM/YYYY, lo invierte a YYYY-MM-DD para compatibilidad absoluta de JS
                             const isDDMMYYYY = /^(\d{2})[-/](\d{2})[-/](\d{4})/.test(dateStr);
                             if (isDDMMYYYY) {
                                 dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$3-$2-$1');
                             }
 
-                            // Sustituir el espacio entre fecha y hora por una T para asegurar la sintaxis ISO en todos los navegadores
                             dateStr = dateStr.replace(' ', 'T');
 
                             const parseDate = new Date(dateStr);
 
-                            // Si logró parsearlo adecuadamente
                             if (!isNaN(parseDate.getTime())) {
                                 fecha = parseDate.toISOString();
                             }
                         }
 
-                        // Mapeo exhaustivo para las 61 columnas reales del archivo final de Garmin
-                        // Calcular duration_minutes (int4) desde la string "1:45:20"
                         let duration_minutes = null;
-                        if (dataTokens[6]) {
-                            const timeParts = dataTokens[6].split(':').map(Number);
+                        if (dataTokens[idxMap.duration]) {
+                            const timeParts = dataTokens[idxMap.duration].split(':').map(Number);
                             if (timeParts.length === 3) {
                                 duration_minutes = Math.round(timeParts[0] * 60 + timeParts[1] + timeParts[2] / 60);
                             } else if (timeParts.length === 2) {
@@ -119,58 +145,45 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                         }
 
                         const act = {
-                            // Columnas de variables existentes en Supabase actual:
                             activity_date: fecha,
-                            distance_km: tNum(dataTokens[4]),
-                            calorias: tNum(dataTokens[5]),
+                            distance_km: tNum(dataTokens[idxMap.dist], 'decimal'),
+                            calorias: tNum(dataTokens[idxMap.cal], 'integer'),
                             duration_minutes: duration_minutes,
 
-                            // Tiempos (Pasan como texto)
-                            tiempo: dataTokens[6] && dataTokens[6] !== '--' ? dataTokens[6] : null,
+                            tiempo: dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--' ? dataTokens[idxMap.duration] : null,
                             tiempo_movimiento: dataTokens[30] && dataTokens[30] !== '--' ? dataTokens[30] : null,
                             tiempo_transcurrido: dataTokens[31] && dataTokens[31] !== '--' ? dataTokens[31] : null,
                             mejor_vuelta: dataTokens[24] && dataTokens[24] !== '--' ? dataTokens[24] : null,
 
-                            // FC
-                            fc_media: tNum(dataTokens[7]),
-                            fc_maxima: tNum(dataTokens[8]),
+                            fc_media: tNum(dataTokens[idxMap.hr_mean], 'integer'),
+                            fc_maxima: tNum(dataTokens[idxMap.hr_max], 'integer'),
                             te_aerobico: tNum(dataTokens[9]),
-
-                            // Velocidad
                             velocidad_media: tNum(dataTokens[10]),
                             velocidad_maxima: tNum(dataTokens[11]),
-
-                            // Ascenso/Descenso
                             ascenso_total: tNum(dataTokens[12]),
                             descenso_total: tNum(dataTokens[13]),
                             altura_min: tNum(dataTokens[32]),
                             altura_max: tNum(dataTokens[33]),
 
-                            // Cadencia
-                            cadencia_media: tNum(dataTokens[14]),
-                            cadencia_maxima: tNum(dataTokens[15]),
+                            cadencia_media: tNum(dataTokens[idxMap.cad_mean], 'integer'),
+                            cadencia_maxima: tNum(dataTokens[idxMap.cad_max], 'integer'),
 
-                            // Potencia
-                            normalized_power: tNum(dataTokens[16]),
-                            training_stress_score: tNum(dataTokens[17]),
-                            potencia_20min: tNum(dataTokens[18]),
-                            potencia_media: tNum(dataTokens[19]),
-                            potencia_maxima: tNum(dataTokens[20]),
-                            pedaladas_totales: tNum(dataTokens[21]),
+                            normalized_power: tNum(dataTokens[idxMap.np], 'integer'),
+                            training_stress_score: tNum(dataTokens[idxMap.tss], 'integer'),
+                            potencia_20min: tNum(dataTokens[idxMap.p20], 'integer'),
+                            potencia_media: tNum(dataTokens[idxMap.p_mean], 'integer'),
+                            potencia_maxima: tNum(dataTokens[idxMap.p_max], 'integer'),
+                            pedaladas_totales: tNum(dataTokens[idxMap.strokes], 'integer'),
 
-                            // Clima Extras
-                            temperatura_min: tNum(dataTokens[22]),
-                            descompresion: dataTokens[23] && dataTokens[23] !== '--' ? dataTokens[23] : null,
-                            numero_vueltas: tNum(dataTokens[25]),
-                            temperatura_max: tNum(dataTokens[26]),
-
-                            // Respiración
-                            resp_media: tNum(dataTokens[27]),
-                            resp_min: tNum(dataTokens[28]),
-                            resp_max: tNum(dataTokens[29]),
+                            temperatura_min: tNum(dataTokens[idxMap.temp_min], 'decimal'),
+                            descompresion: dataTokens[idxMap.descompresion] && dataTokens[idxMap.descompresion] !== '--' ? dataTokens[idxMap.descompresion] : null,
+                            numero_vueltas: tNum(dataTokens[idxMap.laps], 'integer'),
+                            temperatura_max: tNum(dataTokens[idxMap.temp_max], 'decimal'),
+                            resp_media: tNum(dataTokens[idxMap.resp_mean], 'integer'),
+                            resp_min: tNum(dataTokens[idxMap.resp_min], 'integer'),
+                            resp_max: tNum(dataTokens[idxMap.resp_max], 'integer'),
                         };
 
-                        // Purgar valores 'null' del objeto para enviar solo lo existente y útil
                         Object.keys(act).forEach(key => {
                             if ((act as any)[key] === null) {
                                 delete (act as any)[key];
@@ -178,7 +191,6 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                         });
 
 
-                        // Insistir que solo pasa si calculó la distancia (usando la llave real de supabase)
                         if (act.distance_km !== undefined) {
                             activitiesToInsert.push(act);
                         }
