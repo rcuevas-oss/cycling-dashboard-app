@@ -55,6 +55,16 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
 
                     {/* Right Side: Start Button & Mobile Toggle */}
                     <div className="flex items-center gap-4">
+                        <a
+                            href="https://github.com/rcuevas-oss"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hidden md:flex text-zinc-400 hover:text-white transition-colors"
+                            title="GitHub"
+                        >
+                            <SiGithub className="w-5 h-5" />
+                        </a>
+
                         <button
                             onClick={onGetStarted}
                             className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-white text-black text-sm font-bold rounded-xl transition-all hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.2)]"
@@ -84,6 +94,17 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                         <button onClick={() => scrollToSection('about')} className="flex items-center justify-between py-3 text-left text-zinc-300 font-medium border-b border-white/5">
                             Quiénes Somos <ChevronRight className="w-4 h-4 opacity-50" />
                         </button>
+                        <a
+                            href="https://github.com/rcuevas-oss"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between py-3 text-left text-zinc-300 font-medium border-b border-white/5"
+                        >
+                            <span className="flex items-center gap-3">
+                                <SiGithub className="w-5 h-5" /> GitHub
+                            </span>
+                            <ChevronRight className="w-4 h-4 opacity-50" />
+                        </a>
                         <button onClick={onGetStarted} className="mt-2 w-full flex items-center justify-center gap-2 px-5 py-4 bg-garmin-blue text-white text-sm font-bold rounded-xl shadow-[0_0_20px_rgba(0,124,195,0.3)]">
                             Iniciar Sesión <ArrowRight className="w-4 h-4" />
                         </button>
@@ -341,18 +362,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                     <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center mb-6 border border-white/10">
                         <Activity className="w-5 h-5 text-garmin-blue" />
                     </div>
-                    <p className="text-zinc-500 text-sm mb-4">Desarrollado para ciclistas que aman los datos.</p>
-
-                    <a
-                        href="https://github.com/rcuevas-oss"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 mb-6 px-4 py-2 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all hover:scale-105"
-                    >
-                        <SiGithub className="w-5 h-5" />
-                        <span className="text-sm font-medium">rcuevas-oss</span>
-                    </a>
-
+                    <p className="text-zinc-500 text-sm mb-2">Desarrollado para ciclistas que aman los datos.</p>
                     <p className="text-zinc-600 text-xs">© 2026 Cycling AI Trainer. Todos los derechos reservados.</p>
                 </div>
             </footer>
