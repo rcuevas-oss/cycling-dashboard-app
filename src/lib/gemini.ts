@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { TRAINING_BLOCKS } from "../components/TrainingPlanner";
+
 import { TrainingBlock } from "./fitUtils";
 
 export async function generateWeeklyPlan(
@@ -12,12 +13,12 @@ export async function generateWeeklyPlan(
 
     const ai = new GoogleGenAI({ apiKey });
 
-    // Construimos el diccionario de bloques disponibles para que Gemini sepa qué puede elegir
+    // Construimos la librería de bloques individuales disponibles para que Gemini los asigne a días específicos
     const blocksAvailable = TRAINING_BLOCKS.map(b => ({
         id: b.id,
-        nombre: b.title,
-        zona: b.zone,
-        duracion_tipica: b.d
+        title: b.title,
+        zone: b.zone,
+        duration: b.d
     }));
 
     // Generar mapeo de fechas a días de la semana para que la IA no adivine
@@ -62,29 +63,23 @@ Debes responder ESTRICTAMENTE con un solo objeto JSON válido. NO uses Markdown 
   "intent": "menu" | "plan_7d" | "plan_14d" | "plan_30d" | "plan_objetivo" | "analyze_form" | "ftp_test" | "qa" | "plan_ambiguous",
   "respuesta_coach": "El cuerpo de tu respuesta. Si es 'analyze_form', usa 3 partes: 1) Forma, 2) Diagnóstico, 3) Decisión. Si es 'qa' u otro, responde de manera conversacional, respondiendo SÓLO a lo preguntado, corto y sin recitar todas las métricas base por defecto.",
   "opciones_sugeridas": ["Opcion 1", "Opcion 2"], 
-  "plan_calendario": { 
-    "2026-03-04": [], 
-    "2026-03-05": [
-        { 
-          "id": "id_bloque_base", 
-          "title_override": "Nombre Personalizado (Opcional)", 
-          "zone_override": "Z2-Z3 (Opcional)", 
-          "duration_override": "1.5 hrs (Opcional, respeta las horas disp. del día)"
-        }
-    ], ... 
-  } | null,
+  "plan_entrenamientos": [ 
+    { 
+      "date": "2026-03-09", 
+      "block_id": "b-base-std"
+    }
+  ] | null,
   "isGreeting": boolean
 }
 
 REGLAS DE RUTEO POR INTENT:
-0. CREATIVIDAD DEL PLAN: Tienes la libertad de usar los bloques base como "Plantillas" y modificar su nombre, zona o duración usando los campos de \`override\`. JUSTIFICA SIEMPRE en tu \`respuesta_coach\` por qué elegiste esos días y por qué alteraste los bloques para que el usuario entienda la base fisiológica del plan.
+0. ESTRATEGIA DE ASIGNACIÓN (CRÍTICA): Tu trabajo es armar el rompecabezas de su entrenamiento en base a sus disponibilidades. LEE ATENTAMENTE la "disponibilidad" en el PERFIL DEL ATLETA. SOLO PUEDES PLANIFICAR SESIONES EN LOS DÍAS DE LA SEMANA QUE EL ATLETA INDIQUE ESTAR DISPONIBLE. Deja los demás días libres/vacíos. JUSTIFICA SIEMPRE en tu 'respuesta_coach' por qué estructuraste la semana así.
 0. REGLA MAESTRA DE FISIOLOGÍA: Evalúa críticamente el peso (W/kg) de forma proactiva ÚNICAMENTE si el usuario pide explícitamente analizar su forma ("analyze_form") o pide un plan general ("plan_7d"/"plan_14d"/"plan_30d"). NO repitas el sermón del FTP/peso en cada pregunta básica. ¡Habla como un humano!
-1. intent="menu" o "isGreeting"=true: Si el usuario SOLO TE ESTÁ SALUDANDO (ej. "hola", "buen día"). Responde un saludo breve invitando a elegir una opción. "opciones_sugeridas" DEBE estar vacío []. "plan_calendario" DEBE ser null.
-2. intent="qa": Preguntas puntuales (ej. dudas técnicas, o preguntas sobre sus promedios o constancia). Responde SOLO lo preguntado, en 1 a 5 líneas. MÁXIMO 1 o 2 métricas si aplican. PROHIBIDO repetir el diagnóstico general completo. Si pide un dato matemático que no existe en el contexto provisto, responde 'NEED_FETCH: [qué dato falta]' en la respuesta_coach. "plan_calendario" DEBE ser null. "opciones_sugeridas" puede tener hasta 2 dudas relacionadas.
-3. intent="plan_ambiguous": Si el usuario pide un PLAN pero NO especifica duración ni evento. Diles que necesitas saberlo. "plan_calendario" DEBE ser null. "opciones_sugeridas" DEBE contener: ["Planificar Objetivo", "Plan de 7 días", "Mesociclo 30 días"].
+1. intent="menu" o "isGreeting"=true: Si el usuario SOLO TE ESTÁ SALUDANDO (ej. "hola", "buen día"). Responde un saludo breve invitando a elegir una opción. "opciones_sugeridas" DEBE estar vacío []. "plan_entrenamientos" DEBE ser null.
+2. intent="qa": Preguntas puntuales (ej. dudas técnicas, o preguntas sobre sus promedios o constancia). Responde SOLO lo preguntado, en 1 a 5 líneas. MÁXIMO 1 o 2 métricas si aplican. PROHIBIDO repetir el diagnóstico general completo. Si pide un dato matemático que no existe en el contexto provisto, responde 'NEED_FETCH: [qué dato falta]' en la respuesta_coach. "plan_entrenamientos" DEBE ser null. "opciones_sugeridas" puede tener hasta 2 dudas relacionadas.
+3. intent="plan_ambiguous": Si el usuario pide un PLAN pero NO especifica duración ni evento. Diles que necesitas saberlo. "plan_entrenamientos" DEBE ser null. "opciones_sugeridas" DEBE contener: ["Planificar Objetivo", "Plan de 7 días", "Mesociclo 30 días"].
 4. intent="plan_7d", "plan_14d", "plan_30d" o "plan_objetivo": MODO PLANIFICADOR.
-   - SI ES "plan_objetivo": Revisa si hay "fecha_evento" en el perfil. Si NO la hay, dile que vaya a su Perfil Biométrico y configure su fecha exacta del evento. Si SÍ la hay, calcula (aproximadamente) cuántas semanas faltan desde hoy. Si faltan más de 4 semanas, entrégale el PRIMER MESOCICLO de 4 semanas (28 fechas) enfocado en Fase Base o Build. Si faltan menos de 28 días, entrégale los días exactos restantes como Fase Peaking / Tapering.
-   - SI ES "plan_7d", "14d" o "30d": Genera los días solicitados.
+   - SI ES "plan_objetivo": Revisa si hay "fecha_evento" en el perfil. Si NO la hay, dile que vaya a su Perfil Biométrico y configure su fecha exacta del evento. Si SÍ la hay, calcula cuánto falta para esa fecha.
    - REGLA DE FORMATO COACH: DEBES usar una estructura visual PROPIA Y DISTINTA al análisis. Ejemplo de estructura:
      ### 🗓️ Tu Camino hacia [Objetivo Principal]
      *(Explica tu decisión táctica para las próximas semanas. Habla sobre la Fase del entrenamiento: Base, Build o Peak).*
@@ -94,32 +89,25 @@ REGLAS DE RUTEO POR INTENT:
    ### 📊 Tu Estado de Forma Actual
    *(Explica el TSS, volumen y el CTL en palabras simples: "Vienes con muy buena base", "Estás asimilando mucha carga de golpe").*
    ### ⚖️ El Motor (W/kg)
-   *(Evalúa su "relacion_wkg" y peso de forma amigable pero directa: "Tu FTP de X es genial, pero si perdieras Y kilos volarías en las subidas").*
+   *(Evalúa su "relacion_wkg" y peso de forma amigable pero directa).*
    ### 🎯 Mi Consejo Táctico
    *(Sugerencia accionable y clara).* 
-   "plan_calendario" = null. "opciones_sugeridas" puede tener gatillos como ["Planificar Objetivo", "Plan de 7 días"]. 
+   "plan_entrenamientos" = null. "opciones_sugeridas" puede tener gatillos como ["Planificar Objetivo", "Plan de 7 días"]. 
    PROHIBIDO INCLUIR ESTA ESTRUCTURA CUANDO SE PIDA UN PLAN SEMANAL (REGLA 4).
-6. intent="ftp_test": Si pide test de FTP. Explica el protocolo. "plan_calendario" = null.
+6. intent="ftp_test": Si pide test de FTP. Explica el protocolo. "plan_entrenamientos" = null.
 
-REGLAS DE PLAN_CALENDARIO (Si intent es plan_X):
-Usa ESTRICTAMENTE los IDs de la siguiente lista de BLOQUES DISPONIBLES:
+REGLAS DE PLAN_ENTRENAMIENTOS (Si intent es plan_X):
+Usa ESTRICTAMENTE los IDs de la siguiente lista de BLOQUES DE ENTRENAMIENTO disponibles:
 ${JSON.stringify(blocksAvailable, null, 2)}
 
 DISEÑO LÓGICO Y FISIOLÓGICO DEL CICLO (OBLIGATORIO):
-1. LLAVES DE FECHA EXACTAS: Usa cadenas de texto con la fecha en formato ISO (YYYY-MM-DD). La fecha de inicio es HOY (Día 1): ${new Date().toISOString().split('T')[0]}. Empieza el plan desde hoy o mañana, y corre en fechas consecutivas según el intent (7, 14, 30 días, o según plan_objetivo).
-2. DISTRIBUCIÓN POR DISPONIBILIDAD ESTRICTA: Lee detalladamente el campo "disponibilidad_semanal" en el PERFIL DEL ATLETA. Este indica explícitamente qué días de la semana y cuántas horas tiene libre el usuario de techo máximo.
-   - REGLA DE DESCANSO: Si un día de la semana NO ESTÁ explícitamente asignado con horas en esa lista de "disponibilidad_semanal", debes asignar **OBLIGATORIAMENTE** un array vacío \`[]\` a ese día (Descanso forzado por rutina de vida y trabajo). SIN EXCEPCIONES. NUNCA programes un bloque en un día que no está en la lista.
-   - REGLA DE DOSIS MÍNIMA (TECHO): El tiempo disponible NO es un objetivo a rellenar obligatoriamente. Prescribe la dosis fisiológica correcta, asegurándote que tu "duration_override" NUNCA supere el techo de horas de ese día.
-   - REGLA DE VOLUMEN (Z2 LARGA): Identifica el o los días de la semana con mayor cantidad de horas disponibles (usualmente fin de semana, pero fíjate bien) y asigna ahí la tirada larga semanal de Resistencia (Fondo Z2).
-3. VARIABILIDAD DINÁMICA DE BLOQUES: Usa las plantillas base de \`blocksAvailable\`, pero NO TE LIMITES A SUS NOMBRES POR DEFECTO. Eres un entrenador. Usa el parámetro \`title_override\` para estructurar entrenamientos específicos.
-   - Ejemplos de personalización: Si usas el bloque de "Intervalos Z4", altera el \`title_override\` a "Microintervalos 4x5 mins Z4" o "Over-Unders 3x10 mins Z4/Z3". Si usas "Fondo Z2", ponle "Fondo Dominical c/ cadencia alta (Z2)".
-   - Modifica \`zone_override\` si vas a hacer bloques mixtos (Ej: "Z2 -> Z4"). Modifica \`duration_override\` para que cuadre exactamente con el tiempo asignado a la sesión (ej. "1h 15m").
-4. DESCANSO TOTAL Y RECUPERACIÓN: Si el atleta puso disponibilidad todos los días, SIGUE SIENDO responsabilidad tuya (fisiológicamente) asignar OBLIGATORIAMENTE 1 o 2 días a la semana de DESCANSO TOTAL \`[]\`.
-5. EVITAR ROBOTISMO: NO alternes actividades mecánicamente (ej. Z1, Z2, Z1, Z2). Construye bloques inteligentes con periodización ondulante según la fase (carga, impacto, recuperación activa).`;
+1. FECHAS DE INICIO (date): Usa cadenas de texto con la fecha en formato ISO (YYYY-MM-DD). RESPETA ROTUNDAMENTE LA DISPONIBILIDAD DEL ATLETA. Si dice "Solo Lunes y Miércoles", asegúrate de que cada 'date' en el JSON caiga en esos días de la semana y ninguno en otro. Fecha actual: ${new Date().toISOString().split('T')[0]}. Utiliza el MAPEO DE FECHAS A DÍAS (está en las instrucciones anteriores) para saber qué ISO corresponde a qué día de la semana.
+2. VOLUMEN: Adapta la carga. Planifica la cantidad de días de acuerdo con su disponibilidad temporal. Si se piden 14 días pero solo entrena 3 días a la semana, entrega como máximo unos 6 u 8 bloques, dependiendo de las fechas disponibles en ese rango.
+3. EXCLUSIVIDAD: NO inventes bloques. Solo puedes elegir 'block_id' desde la lista de disponibles provista.`;
 
     // Función sanitizadora ultra-robusta recomendada
     const sanitizeJson = (raw: string) => {
-        const s = raw.replace(/```json|```/g, "").trim();
+        const s = raw.replace(/```json| ```/g, "").trim();
         const start = s.indexOf("{");
         const end = s.lastIndexOf("}");
         if (start === -1 || end === -1 || end <= start) return s;
@@ -135,7 +123,7 @@ DISEÑO LÓGICO Y FISIOLÓGICO DEL CICLO (OBLIGATORIO):
         try {
             const promptContent = attempts === 0
                 ? systemInstruction
-                : `Devuelve SOLO un JSON válido (sin texto extra). Corrige este contenido:\n\n${lastRaw}`;
+                : `Devuelve SOLO un JSON válido(sin texto extra).Corrige este contenido: \n\n${lastRaw} `;
 
             const response = await ai.models.generateContent({
                 model: "gemini-2.5-pro",
@@ -173,16 +161,16 @@ DISEÑO LÓGICO Y FISIOLÓGICO DEL CICLO (OBLIGATORIO):
     data.suggestedOptions = Array.isArray(data.opciones_sugeridas) ? data.opciones_sugeridas : [];
 
     // Forzar null si los intent de ruteo prohíben planes
-    let finalSchedule = data.plan_calendario;
+    let finalSchedule = data.plan_entrenamientos;
     if (data.intent !== 'plan_7d' && data.intent !== 'plan_14d' && data.intent !== 'plan_30d' && data.intent !== 'plan_objetivo') {
         finalSchedule = null;
     }
-    // Asegurar estructura del plan_calendario
-    if (finalSchedule && (typeof finalSchedule !== 'object' || Array.isArray(finalSchedule))) {
+    // Asegurar estructura del plan_entrenamientos
+    if (finalSchedule && !Array.isArray(finalSchedule)) {
         finalSchedule = null;
     }
 
-    if (!finalSchedule || Object.keys(finalSchedule).length === 0) {
+    if (!finalSchedule || finalSchedule.length === 0) {
         return {
             textResponse: data.respuesta_coach || data.mensaje_inspirador || "Procesado.",
             schedule: null,
@@ -191,30 +179,25 @@ DISEÑO LÓGICO Y FISIOLÓGICO DEL CICLO (OBLIGATORIO):
         };
     }
 
-    const mapDay = (dayKey: string) => {
-        const blocksData = finalSchedule[dayKey] || [];
-        return blocksData.map((bInfo: any) => {
-            let id = typeof bInfo === 'string' ? bInfo : bInfo.id;
-            const refBlock = TRAINING_BLOCKS.find(b => b.id === id);
-            if (!refBlock) return null;
-
-            // Instanciar y sobrescribir si la IA decidió personalizar
-            const customBlock: TrainingBlock = { ...refBlock };
-
-            if (typeof bInfo === 'object') {
-                if (bInfo.title_override) customBlock.title = bInfo.title_override;
-                if (bInfo.zone_override) customBlock.zone = bInfo.zone_override;
-                if (bInfo.duration_override) customBlock.d = bInfo.duration_override;
-            }
-
-            console.log("Bloque Generado/Sobrescrito por IA:", customBlock);
-            return customBlock;
-        }).filter(Boolean) as TrainingBlock[];
-    };
-
     const schedule: Record<string, TrainingBlock[]> = {};
-    Object.keys(finalSchedule).forEach(dateKey => {
-        schedule[dateKey] = mapDay(dateKey);
+
+    finalSchedule.forEach((assignment: any) => {
+        if (!assignment.date || !assignment.block_id) return;
+
+        const dateStr = assignment.date; // Esperado en YYYY-MM-DD
+
+        // NO sobrescribimos días previos del calendario planificado actual si el usuario ya tenía algo
+        if (!schedule[dateStr]) {
+            schedule[dateStr] = plannedSchedule && plannedSchedule[dateStr] ? [...plannedSchedule[dateStr]] : [];
+        }
+
+        const blockTemplate = TRAINING_BLOCKS.find(b => b.id === assignment.block_id);
+        if (blockTemplate) {
+            // Check if block already exists on that date to prevent strict duplicates (optional, but clean)
+            if (!schedule[dateStr].some(existing => existing.id === blockTemplate.id)) {
+                schedule[dateStr].push({ ...blockTemplate });
+            }
+        }
     });
 
     return {

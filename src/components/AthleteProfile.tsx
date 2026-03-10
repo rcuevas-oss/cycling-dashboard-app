@@ -123,32 +123,32 @@ export function AthleteProfile({ session, profile, onDataChanged }: { session: S
                         <div className="flex flex-col gap-2">
                             <label className="text-sm font-medium text-zinc-300">Sexo Biológico</label>
                             <select name="sexo" value={formData.sexo} onChange={handleInputChange}
-                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:outline-none focus:border-garmin-blue transition-colors"
+                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:outline-none focus:border-garmin-blue transition-colors appearance-none cursor-pointer"
                             >
-                                <option value="Masculino">Masculino</option>
-                                <option value="Femenino">Femenino</option>
-                                <option value="Otro">Otro</option>
+                                <option value="Masculino" className="bg-zinc-900 text-zinc-300">Masculino</option>
+                                <option value="Femenino" className="bg-zinc-900 text-zinc-300">Femenino</option>
+                                <option value="Otro" className="bg-zinc-900 text-zinc-300">Otro</option>
                             </select>
                         </div>
                         <div className="flex flex-col gap-2">
                             <label className="text-sm font-medium text-zinc-300">Disciplina Principal</label>
                             <select name="disciplina" value={formData.disciplina} onChange={handleInputChange}
-                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:outline-none focus:border-garmin-blue transition-colors"
+                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:outline-none focus:border-garmin-blue transition-colors appearance-none cursor-pointer"
                             >
-                                <option value="Ruta">Ruta</option>
-                                <option value="MTB">MTB</option>
-                                <option value="Gravel">Gravel</option>
-                                <option value="Pista">Pista</option>
+                                <option value="Ruta" className="bg-zinc-900 text-zinc-300">Ruta</option>
+                                <option value="MTB" className="bg-zinc-900 text-zinc-300">MTB</option>
+                                <option value="Gravel" className="bg-zinc-900 text-zinc-300">Gravel</option>
+                                <option value="Pista" className="bg-zinc-900 text-zinc-300">Pista</option>
                             </select>
                         </div>
                         <div className="flex flex-col gap-2 col-span-2">
                             <label className="text-sm font-medium text-zinc-300">Objetivo Principal / Enfoque</label>
                             <select name="objetivo" value={formData.objetivo} onChange={handleInputChange}
-                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:outline-none focus:border-garmin-blue transition-colors"
+                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:outline-none focus:border-garmin-blue transition-colors appearance-none cursor-pointer"
                             >
-                                <option value="Salud y Recreacional">Salud y Recreacional (Longevidad, Z2, sin estrés)</option>
-                                <option value="Mantenimiento / Fitness General">Mantenimiento / Fitness General (Mantener base, divertirse)</option>
-                                <option value="Competición / Evento Específico">Competición / Evento Específico (Preparación estructurada)</option>
+                                <option value="Salud y Recreacional" className="bg-zinc-900 text-zinc-300">Salud y Recreacional (Longevidad, Z2, sin estrés)</option>
+                                <option value="Mantenimiento / Fitness General" className="bg-zinc-900 text-zinc-300">Mantenimiento / Fitness General (Mantener base, divertirse)</option>
+                                <option value="Competición / Evento Específico" className="bg-zinc-900 text-zinc-300">Competición / Evento Específico (Preparación estructurada)</option>
                             </select>
                         </div>
                         <div className="flex flex-col gap-2 col-span-2">

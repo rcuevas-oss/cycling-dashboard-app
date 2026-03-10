@@ -1,0 +1,12 @@
+src/components/Dashboard.tsx(6,69): error TS6133: 'AreaChart' is declared but its value is never read.
+src/components/Dashboard.tsx(454,45): error TS2322: Type '(value: number) => [JSX.Element, string]' is not assignable to type 'Formatter<ValueType, NameType> & ((value: ValueType, name: NameType, item: TooltipPayloadEntry, index: number, payload: TooltipPayload) => ReactNode | [...])'.
+  Type '(value: number) => [JSX.Element, string]' is not assignable to type 'Formatter<ValueType, NameType>'.
+    Types of parameters 'value' and 'value' are incompatible.
+      Type 'ValueType | undefined' is not assignable to type 'number'.
+        Type 'undefined' is not assignable to type 'number'.
+src/components/Dashboard.tsx(464,57): error TS6133: 'fill' is declared but its value is never read.
+src/components/Dashboard.tsx(521,45): error TS2322: Type '(value: number, name: string) => [JSX.Element, JSX.Element]' is not assignable to type 'Formatter<ValueType, NameType> & ((value: ValueType, name: NameType, item: TooltipPayloadEntry, index: number, payload: TooltipPayload) => ReactNode | [...])'.
+  Type '(value: number, name: string) => [JSX.Element, JSX.Element]' is not assignable to type 'Formatter<ValueType, NameType>'.
+    Types of parameters 'value' and 'value' are incompatible.
+      Type 'ValueType | undefined' is not assignable to type 'number'.
+        Type 'undefined' is not assignable to type 'number'.

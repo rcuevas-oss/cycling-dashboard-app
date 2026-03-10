@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DndContext, useDraggable, useDroppable, DragEndEvent } from '@dnd-kit/core';
 import { Info, X, Save } from 'lucide-react';
 import { TrainingBlock } from '../lib/fitUtils';
+import { PREDEFINED_MICROCYCLES } from '../lib/trainingMicrocycles';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth, isToday, isBefore, startOfDay } from 'date-fns';
@@ -95,7 +96,7 @@ export function formatZoneWatts(ftp: number | null | undefined, zoneString: stri
 }
 
 // Componente: Tarjeta Arrastrable (Librería)
-function DraggableBlock({ id, block, ftp }: { id: string, block: typeof TRAINING_BLOCKS[0], ftp?: number }) {
+function DraggableBlock({ id, block }: { id: string, block: typeof TRAINING_BLOCKS[0] }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: id,
         data: block
@@ -107,8 +108,6 @@ function DraggableBlock({ id, block, ftp }: { id: string, block: typeof TRAINING
         opacity: isDragging ? 0.8 : 1,
     } : undefined;
 
-    const watts = formatZoneWatts(ftp, block.zone);
-
     return (
         <div
             ref={setNodeRef} style={style} {...listeners} {...attributes}
@@ -118,11 +117,6 @@ function DraggableBlock({ id, block, ftp }: { id: string, block: typeof TRAINING
                 <span className="text-xs font-bold px-1.5 py-0.5 rounded-sm bg-black/40">{block.zone}</span>
                 <span className="text-[10px] text-zinc-400 font-mono shrink-0 ml-1">{block.d}</span>
             </div>
-            {watts && (
-                <div className="text-[10px] font-mono opacity-80 leading-none truncate">
-                    ⚡ {watts}
-                </div>
-            )}
             <p className="text-sm font-semibold truncate mt-0.5">{block.title}</p>
         </div>
     );
@@ -187,6 +181,7 @@ export function TrainingPlanner({ schedule, setSchedule, session, profile }: { s
     const [selectedBlock, setSelectedBlock] = useState<{ block: TrainingBlock, dateId: string } | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [selectedMicrocycle, setSelectedMicrocycle] = useState<string>('');
 
     // Extraer FTP para los cálculos de la librería y el calendario
     const ftp = profile?.ftp_actual ? Number(profile.ftp_actual) : undefined;
@@ -239,15 +234,49 @@ export function TrainingPlanner({ schedule, setSchedule, session, profile }: { s
         }
     }
 
+    const applyMicrocycle = () => {
+        if (!selectedMicrocycle) return;
+        const mc = PREDEFINED_MICROCYCLES.find(m => m.id === selectedMicrocycle);
+        if (!mc) return;
+
+        // Apply starting from the current beginning of the week of the displayed month
+        // or starting from today if viewing current month. For simplicity let's use the start of the current week viewed. 
+        // A better approach would be letting user select start date, but keeping it minimal: Use today as Day 1 if in current month, else 1st of month.
+        const baseDate = isSameMonth(new Date(), currentMonth) ? new Date() : startOfMonth(currentMonth);
+        const startDay = startOfWeek(baseDate, { weekStartsOn: 1 }); // Force Monday start
+
+        const newSchedule = { ...schedule };
+
+        for (let i = 1; i <= mc.durationDays; i++) {
+            const blockId = mc.sessionsMap[i];
+            if (blockId) {
+                const targetDate = new Date(startDay);
+                targetDate.setDate(targetDate.getDate() + (i - 1));
+                const dateStr = format(targetDate, 'yyyy-MM-dd');
+
+                const blockTemplate = TRAINING_BLOCKS.find(b => b.id === blockId);
+                if (blockTemplate) {
+                    // Clone block to avoid reference issues
+                    newSchedule[dateStr] = [...(newSchedule[dateStr] || []), { ...blockTemplate }];
+                }
+            }
+        }
+
+        setSchedule(newSchedule);
+        setSelectedMicrocycle('');
+    };
+
     return (
         <div className="space-y-6 animate-fade-in text-zinc-100">
 
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
+            {/* Cabecera Principal */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
                 <div>
                     <h2 className="text-3xl font-extrabold tracking-tight mb-2">Planificador Base</h2>
                     <p className="text-zinc-400">Construye tus ciclos arrastrando bloques hacia el calendario real.</p>
                 </div>
 
+                {/* Controles de Mes */}
                 <div className="flex items-center gap-2 bg-zinc-900/80 p-1.5 rounded-xl border border-zinc-800">
                     <button onClick={handlePrevMonth} className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
@@ -262,32 +291,55 @@ export function TrainingPlanner({ schedule, setSchedule, session, profile }: { s
                         <span className="text-base font-bold text-white capitalize">{format(currentMonth, 'MMMM yyyy', { locale: es })}</span>
                     </div>
                 </div>
+            </div>
 
-                <div className="flex flex-col md:flex-row items-end md:items-center gap-4 shrink-0 mt-4 md:mt-0">
-                    <div className="px-4 py-2 bg-zinc-800/50 rounded-lg border border-zinc-700 shrink-0">
-                        <p className="text-xs text-zinc-400 uppercase tracking-wider font-semibold whitespace-nowrap">Carga Est. (TSS)</p>
-                        <p className="text-xl font-bold font-mono text-amber-400 text-right mt-1">
-                            {Object.values(schedule).flat().length * 60} <span className="text-sm text-zinc-500">tss</span>
+            {/* Barra de Herramientas (Microciclos + Acciones) */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 bg-black/20 p-3 rounded-2xl border border-white/5 flex-wrap">
+                <div className="flex items-center gap-2">
+                    <select
+                        value={selectedMicrocycle}
+                        onChange={(e) => setSelectedMicrocycle(e.target.value)}
+                        className="bg-zinc-900/80 text-sm text-zinc-300 border border-zinc-700 rounded-lg px-3 py-2 focus:outline-none focus:border-garmin-blue hover:bg-zinc-800 transition-colors cursor-pointer appearance-none outline-none"
+                    >
+                        <option value="" className="bg-zinc-900 text-zinc-300">Cargar Microciclo...</option>
+                        {PREDEFINED_MICROCYCLES.map(mc => (
+                            <option key={mc.id} value={mc.id} className="bg-zinc-900 text-zinc-300">
+                                {mc.title} ({mc.durationDays}d)
+                            </option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={applyMicrocycle}
+                        disabled={!selectedMicrocycle}
+                        className="text-xs px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 font-bold rounded-lg disabled:opacity-50 transition-all hover:bg-zinc-700 hover:text-white"
+                    >
+                        Aplicar
+                    </button>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <div className="px-3 py-1.5 bg-zinc-900 rounded-lg border border-zinc-800 flex items-center gap-3">
+                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Carga (TSS)</p>
+                        <p className="text-sm font-bold font-mono text-amber-400">
+                            {Object.values(schedule).flat().length * 60}
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3 pr-2">
-                        <button onClick={clearSchedule} className="text-sm font-medium text-zinc-500 hover:text-rose-400 transition-colors whitespace-nowrap">
-                            Limpiar
-                        </button>
-                        <div className="w-px h-4 bg-zinc-800"></div>
-                        <button
-                            onClick={saveSchedule}
-                            disabled={isSaving}
-                            className={`text-sm font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap ${isSaving
-                                ? 'text-zinc-600 cursor-not-allowed'
-                                : 'text-garmin-blue hover:text-[#00cfa7]'
-                                }`}
-                        >
-                            <Save className="w-4 h-4" />
-                            {isSaving ? 'Guardando...' : 'Guardar Plan'}
-                        </button>
-                    </div>
+                    <button onClick={clearSchedule} className="text-sm font-medium text-zinc-400 hover:text-rose-400 transition-colors px-2">
+                        Limpiar Plan
+                    </button>
+
+                    <button
+                        onClick={saveSchedule}
+                        disabled={isSaving}
+                        className={`text-sm font-semibold transition-colors flex items-center gap-2 px-5 py-2 rounded-xl border ${isSaving
+                            ? 'bg-zinc-900 border-zinc-800 text-zinc-600 cursor-not-allowed'
+                            : 'bg-garmin-blue/10 border-garmin-blue/30 text-garmin-blue hover:bg-garmin-blue hover:text-black hover:border-garmin-blue'
+                            }`}
+                    >
+                        <Save className="w-4 h-4" />
+                        {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+                    </button>
                 </div>
             </div>
 
@@ -301,7 +353,7 @@ export function TrainingPlanner({ schedule, setSchedule, session, profile }: { s
                         </h3>
                         <div className="space-y-2 overflow-y-auto pr-2 custom-scrollbar max-h-[500px]">
                             {TRAINING_BLOCKS.map(block => (
-                                <DraggableBlock key={block.id} id={block.id} block={block} ftp={ftp} />
+                                <DraggableBlock key={block.id} id={block.id} block={block} />
                             ))}
                         </div>
                         <p className="mt-6 text-xs text-zinc-500 text-center leading-relaxed">
@@ -457,3 +509,4 @@ export function TrainingPlanner({ schedule, setSchedule, session, profile }: { s
         </div>
     );
 }
+

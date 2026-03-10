@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import Papa from 'papaparse';
 import { Session } from '@supabase/supabase-js';
+import { getDailyLoads, calculatePMC, getConsistencyLast7Days, getZoneDistribution, getLoadLastNDays, getSessionsLast7Days } from '../lib/metricsUtils';
+import { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, Area, ComposedChart, ReferenceLine, CartesianGrid } from 'recharts';
 
 export function Dashboard({ session, activities, onDataChanged }: { session: Session, activities: any[], onDataChanged: () => Promise<void> }) {
     const [file, setFile] = useState<File | null>(null);
@@ -295,6 +297,55 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
         }
     };
 
+    // --- CÁLCULO DE MÉTRICAS FISIOLÓGICAS (Memoizadas) ---
+    const metrics = useMemo(() => {
+        if (!activities || activities.length === 0) return null;
+
+        const dailyLoads = getDailyLoads(activities);
+        const pmcData = calculatePMC(dailyLoads);
+        const pmcHistory = pmcData.results;
+
+        // Métricas "Actuales" (El verdadero último día con historial)
+        const todayPMC = pmcHistory[pmcHistory.length - 1] || { ctlDisplayed: 0, atlDisplayed: 0, tsbDisplayed: 0 };
+
+        const consistency = getConsistencyLast7Days(dailyLoads);
+        const zones = getZoneDistribution(activities, 30);
+        const load7d = getLoadLastNDays(dailyLoads, 7);
+        const load28d = getLoadLastNDays(dailyLoads, 28);
+        const sessionsThisWeek = getSessionsLast7Days(activities);
+
+        return {
+            ctl: todayPMC.ctlDisplayed || 0,
+            atl: todayPMC.atlDisplayed || 0,
+            tsb: todayPMC.tsbDisplayed || 0,
+            history14d: pmcHistory.slice(-14), // Array de últimos 14 días para el gráfico
+            maturityStatus: pmcData.status,
+            daysAvailable: pmcData.daysAvailable,
+            readinessScore: pmcData.readinessScore,
+            consistency,
+            zones,
+            load7d,
+            load28d,
+            sessionsThisWeek
+        };
+    }, [activities]);
+
+    // Helper visual para TSB (Más prudente según feedback)
+    const getFormColor = (tsb: number) => {
+        if (tsb > 25) return "text-sky-400"; // Muy fresco
+        if (tsb >= 10) return "text-emerald-400"; // Fresco
+        if (tsb >= -10) return "text-garmin-blue"; // Estable
+        if (tsb >= -30) return "text-amber-400"; // Fatigado
+        return "text-rose-500"; // Muy fatigado
+    };
+    const getFormDesc = (tsb: number) => {
+        if (tsb > 25) return "Muy Fresco";
+        if (tsb >= 10) return "Fresco / Tapering";
+        if (tsb >= -10) return "Estable / Óptimo";
+        if (tsb >= -30) return "Fatigado / Carga";
+        return "Muy Fatigado / Riesgo";
+    };
+
     return (
         <div className="w-full text-left flex flex-col h-full gap-6 lg:gap-8">
             {/* Cabecera Principal */}
@@ -310,6 +361,305 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                     Cerrar Sesión
                 </button>
             </div>
+
+            {/* PANEL ANALÍTICO DE MÉTRICAS FISIOLÓGICAS */}
+            {metrics && (
+                <div className="flex flex-col gap-6 w-full">
+
+                    {/* FILA 1: TARJETAS RESUMEN (Carga 7d, Carga 28d, Fatiga, Forma, Sesiones) */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        {/* Carga 7d */}
+                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-3xl flex flex-col justify-between group hover:border-zinc-700/80 transition-all shadow-xl hover:shadow-2xl relative overflow-hidden backdrop-blur-sm cursor-default">
+                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                            <span className="text-[11px] font-bold text-zinc-500 tracking-widest mb-2">CARGA 7D</span>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-white group-hover:scale-105 origin-left transition-transform">{metrics.load7d}</span>
+                                <span className="text-[10px] text-zinc-500 font-mono">tss</span>
+                            </div>
+                        </div>
+
+                        {/* Carga 28d */}
+                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-3xl flex flex-col justify-between group hover:border-zinc-700/80 transition-all shadow-xl hover:shadow-2xl relative overflow-hidden backdrop-blur-sm cursor-default">
+                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                            <span className="text-[11px] font-bold text-zinc-500 tracking-widest mb-2">CARGA 28D</span>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-white group-hover:scale-105 origin-left transition-transform">{metrics.load28d}</span>
+                                <span className="text-[10px] text-zinc-500 font-mono">tss</span>
+                            </div>
+                        </div>
+
+                        {/* Fatiga Actual (ATL) */}
+                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-3xl flex flex-col justify-between group hover:border-rose-500/30 transition-all shadow-xl hover:shadow-rose-500/10 relative overflow-hidden backdrop-blur-sm cursor-default">
+                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-rose-500/20 to-transparent"></div>
+                            <span className="text-[11px] font-bold text-zinc-500 tracking-widest mb-2 flex justify-between items-center w-full">
+                                FATIGA (ATL)
+                                {metrics.maturityStatus === 'provisional' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500/70">Est.</span>}
+                            </span>
+                            <div className="flex items-baseline gap-2">
+                                {metrics.maturityStatus === 'insufficient' ? (
+                                    <span className="text-xl font-black text-zinc-600">--</span>
+                                ) : (
+                                    <>
+                                        <span className="text-3xl font-black text-rose-400 group-hover:text-rose-300 transition-colors drop-shadow-[0_0_8px_rgba(251,113,133,0.3)]">{metrics.atl}</span>
+                                        <span className="text-[10px] text-zinc-500 font-mono">tss/d</span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Forma Actual (TSB) */}
+                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-3xl flex flex-col justify-between group relative overflow-hidden shadow-xl hover:shadow-sky-500/10 hover:border-sky-500/30 transition-all cursor-default">
+                            <div className="absolute inset-0 opacity-10 blur-2xl transition-all group-hover:opacity-20 bg-gradient-to-br from-garmin-blue to-emerald-500 pointer-events-none"></div>
+                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-sky-500/20 to-transparent"></div>
+                            <span className="text-[11px] font-bold text-zinc-500 tracking-widest mb-2 relative z-10 flex justify-between items-center w-full">
+                                FORMA (TSB)
+                                {metrics.maturityStatus === 'provisional' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500/70">Est.</span>}
+                            </span>
+
+                            {metrics.maturityStatus === 'insufficient' ? (
+                                <div className="flex flex-col justify-center h-full">
+                                    <span className="text-[10px] text-zinc-500 leading-tight">Analizando historial...<br />({metrics.daysAvailable}/20 días)</span>
+                                    <div className="w-full h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
+                                        <div className="h-full bg-zinc-600 rounded-full" style={{ width: `${(metrics.daysAvailable / 20) * 100}%` }}></div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-baseline gap-2 relative z-10">
+                                        <span className={`text-3xl font-black ${getFormColor(metrics.tsb)} drop-shadow-md`}>{metrics.tsb > 0 ? '+' : ''}{metrics.tsb}</span>
+                                    </div>
+                                    <span className={`text-[10px] font-bold mt-1 uppercase relative z-10 ${getFormColor(metrics.tsb)} opacity-80`}>{getFormDesc(metrics.tsb)}</span>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Sesiones de la Semana */}
+                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-3xl flex flex-col justify-between group hover:border-emerald-500/30 transition-all shadow-xl hover:shadow-emerald-500/10 lg:col-span-1 md:col-span-2 col-span-2 relative overflow-hidden backdrop-blur-sm cursor-default">
+                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent"></div>
+                            <span className="text-[11px] font-bold text-zinc-500 tracking-widest mb-2">SESIONES (7D)</span>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-emerald-400 group-hover:text-emerald-300 transition-colors drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]">{metrics.sessionsThisWeek}</span>
+                                <span className="text-[10px] text-zinc-500 font-mono">actividades</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* FILA 2: GRÁFICOS (Carga Diaria, PMC, Zonas, Consistencia) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        {/* 1. GRÁFICO CARGA DIARIA (Últimos 14 días en barras) */}
+                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-6 rounded-3xl flex flex-col shadow-2xl relative overflow-hidden group/chart cursor-default">
+                            {/* Decorative background glow */}
+                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent"></div>
+
+                            <div className="mb-6 flex justify-between items-center z-10">
+                                <h4 className="text-xs font-bold text-zinc-400 tracking-widest">CARGA DIARIA (14D)</h4>
+                            </div>
+
+                            <div className="flex-1 w-full mt-4" style={{ minHeight: '200px' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={metrics.history14d} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3f3f46" strokeOpacity={0.4} />
+                                        <XAxis
+                                            dataKey="date"
+                                            tickFormatter={(val) => new Date(val + 'T00:00:00').toLocaleDateString('es', { weekday: 'short' }).substring(0, 2).toUpperCase()}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#71717a', fontSize: 10, fontWeight: 600 }}
+                                            dy={10}
+                                        />
+                                        <YAxis
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#71717a', fontSize: 10 }}
+                                            tickCount={4}
+                                        />
+                                        <Tooltip
+                                            cursor={{ fill: '#27272a', opacity: 0.4 }}
+                                            contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
+                                            itemStyle={{ color: '#e4e4e7', fontWeight: 'bold' }}
+                                            labelStyle={{ color: '#a1a1aa', fontSize: '12px', marginBottom: '4px' }}
+                                            formatter={(value: any) => [<span className="text-garmin-blue">{Math.round(Number(value))} TSS</span>, 'Carga']}
+                                            labelFormatter={(label) => new Date(label + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                        />
+                                        <Bar
+                                            dataKey="tss"
+                                            fill="#0ea5e9"
+                                            radius={[4, 4, 0, 0]}
+                                            maxBarSize={40}
+                                            activeBar={{ filter: 'brightness(1.2)' }}
+                                            shape={(props: any) => {
+                                                const { x, y, width, height } = props;
+                                                let color = '#0ea5e9'; // garmin-blue
+                                                if (props.payload.tss > 100) color = '#f43f5e'; // rose-500
+                                                else if (props.payload.tss > 60) color = '#f59e0b'; // amber-500
+
+                                                return <rect x={x} y={y} width={width} height={height} fill={color} rx={4} ry={4} />;
+                                            }}
+                                        />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* 2. GRÁFICO PMC (CTL, ATL, TSB renderizados vía SVG nativo) */}
+                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-6 rounded-3xl flex flex-col relative overflow-hidden shadow-2xl">
+                            {/* Decorative background glow */}
+                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-900/50 to-transparent"></div>
+
+                            <div className="mb-4 flex flex-col sm:flex-row justify-between sm:items-center z-10 relative gap-2">
+                                <div className="flex flex-col gap-1">
+                                    <h4 className="text-xs font-bold text-zinc-400 tracking-widest flex items-center gap-2">
+                                        DINÁMICA DE CARGA (PMC 14D)
+                                        {metrics.maturityStatus === 'provisional' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">Calibrando ({metrics.daysAvailable}/42d)</span>}
+                                        {metrics.maturityStatus === 'calibrated' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Calibrado</span>}
+                                    </h4>
+                                    {metrics.maturityStatus === 'insufficient' ? (
+                                        <p className="text-[10px] text-zinc-500 max-w-sm">Gráfico en construcción. Necesitamos al menos 20 días de historial para proyectar la carga cardiovascular. Días actuales: {metrics.daysAvailable}</p>
+                                    ) : null}
+                                </div>
+
+                                {metrics.maturityStatus !== 'insufficient' && (
+                                    <div className="flex gap-4 text-xs font-semibold bg-black/20 px-3 py-1.5 rounded-full border border-white/5">
+                                        <span className="text-sky-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-sky-400"></span>CTL</span>
+                                        <span className="text-rose-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-400"></span>ATL</span>
+                                        <span className="text-amber-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400"></span>TSB</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex-1 w-full mt-4" style={{ minHeight: '240px' }}>
+                                {metrics.maturityStatus === 'insufficient' ? (
+                                    <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/40">
+                                        <svg className="w-8 h-8 text-zinc-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                        </svg>
+                                        <p className="text-sm font-medium text-zinc-400">Recopilando datos iniciales</p>
+                                        <div className="w-48 h-1.5 bg-zinc-800 rounded-full mt-4 overflow-hidden">
+                                            <div className="h-full bg-garmin-blue rounded-full transition-all duration-1000" style={{ width: `${(metrics.daysAvailable / 20) * 100}%` }}></div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart data={metrics.history14d} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="colorCtl" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3f3f46" strokeOpacity={0.4} />
+                                            <XAxis
+                                                dataKey="date"
+                                                tickFormatter={(val) => new Date(val + 'T00:00:00').toLocaleDateString('es', { weekday: 'short' }).substring(0, 2).toUpperCase()}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                tick={{ fill: '#71717a', fontSize: 10, fontWeight: 600 }}
+                                                dy={10}
+                                            />
+                                            <YAxis
+                                                yAxisId="left"
+                                                axisLine={false}
+                                                tickLine={false}
+                                                tick={{ fill: '#71717a', fontSize: 10 }}
+                                            />
+                                            <ReferenceLine y={0} yAxisId="left" stroke="#52525b" strokeDasharray="3 3" />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
+                                                labelStyle={{ color: '#a1a1aa', fontSize: '12px', marginBottom: '8px' }}
+                                                labelFormatter={(label) => new Date(label + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                                formatter={(value: any, name: any) => [
+                                                    <span className="font-bold">{Math.round(Number(value))}</span>,
+                                                    <span className="uppercase text-xs tracking-wider">{String(name)}</span>
+                                                ]}
+                                            />
+                                            <Bar yAxisId="left" dataKey="tsbDisplayed" name="TSB" barSize={8} radius={[4, 4, 4, 4]} fill="#f59e0b">
+                                                {
+                                                    metrics.history14d.map((entry, index) => {
+                                                        const color = entry.tsbDisplayed > 10 ? '#34d399' : entry.tsbDisplayed > 0 ? '#10b981' : entry.tsbDisplayed < -20 ? '#f43f5e' : '#f59e0b';
+                                                        return <Cell key={`cell-${index}`} fill={color} />;
+                                                    })
+                                                }
+                                            </Bar>
+                                            <Area yAxisId="left" type="monotone" dataKey="ctlDisplayed" name="CTL" stroke="#38bdf8" strokeWidth={3} fillOpacity={1} fill="url(#colorCtl)" activeDot={{ r: 6, strokeWidth: 0, fill: '#38bdf8' }} />
+                                            <Area yAxisId="left" type="monotone" dataKey="atlDisplayed" name="ATL" stroke="#fb7185" strokeWidth={2} fill="none" activeDot={{ r: 4, strokeWidth: 0, fill: '#fb7185' }} />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 3. GRÁFICO DISTRIBUCIÓN POR ZONAS */}
+                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-6 rounded-3xl flex flex-col justify-center shadow-2xl">
+                            <h4 className="text-xs font-bold text-zinc-400 tracking-widest mb-6">DISTRIBUCIÓN POR ZONAS (30D)</h4>
+                            <div className="w-full h-14 flex rounded-2xl overflow-hidden gap-1.5 mt-2 mb-6">
+                                {metrics.zones.base > 0 && (
+                                    <div className="bg-gradient-to-r from-sky-600 to-sky-400 h-full flex items-center justify-center transition-all hover:brightness-110 shadow-[inner_0_0_10px_rgba(255,255,255,0.1)] rounded-xl" style={{ width: `${metrics.zones.base}%` }} title={`Base/Aeróbico: ${metrics.zones.base}%`}>
+                                        {metrics.zones.base > 15 && <span className="text-[11px] font-black text-white drop-shadow-md">{metrics.zones.base}%</span>}
+                                    </div>
+                                )}
+                                {metrics.zones.umbral > 0 && (
+                                    <div className="bg-gradient-to-r from-amber-500 to-amber-300 h-full flex items-center justify-center transition-all hover:brightness-110 shadow-[inner_0_0_10px_rgba(255,255,255,0.1)] rounded-xl" style={{ width: `${metrics.zones.umbral}%` }} title={`Umbral/Tempo: ${metrics.zones.umbral}%`}>
+                                        {metrics.zones.umbral > 15 && <span className="text-[11px] font-black text-amber-950 drop-shadow-sm">{metrics.zones.umbral}%</span>}
+                                    </div>
+                                )}
+                                {metrics.zones.vo2 > 0 && (
+                                    <div className="bg-gradient-to-r from-rose-600 to-rose-400 h-full flex items-center justify-center transition-all hover:brightness-110 shadow-[inner_0_0_10px_rgba(255,255,255,0.1)] rounded-xl" style={{ width: `${metrics.zones.vo2}%` }} title={`VO2/Anaeróbico: ${metrics.zones.vo2}%`}>
+                                        {metrics.zones.vo2 > 15 && <span className="text-[11px] font-black text-white drop-shadow-md">{metrics.zones.vo2}%</span>}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex justify-between w-full text-xs font-medium text-zinc-400 mt-auto bg-black/20 p-3 rounded-xl border border-white/5">
+                                <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gradient-to-tr from-sky-600 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]"></span> Z1/Z2 (Base)</span>
+                                <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></span> Z3/Z4 (Umbral)</span>
+                                <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gradient-to-tr from-rose-600 to-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></span> Z5+ (VO2 Max)</span>
+                            </div>
+                        </div>
+
+                        {/* 4. GRÁFICO CONSISTENCIA SEMANAL */}
+                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-6 rounded-3xl flex flex-col justify-center shadow-2xl">
+                            <h4 className="text-xs font-bold text-zinc-400 tracking-widest mb-6">CONSISTENCIA SEMANAL</h4>
+                            <div className="flex justify-between items-center w-full gap-2 lg:gap-3 mt-auto">
+                                {/* Generar historial de los últimos 7 días */}
+                                {(() => {
+                                    const grid = [];
+                                    const totalDays = 7;
+                                    const today = new Date();
+
+                                    for (let i = totalDays - 1; i >= 0; i--) {
+                                        const d = new Date(today);
+                                        d.setDate(today.getDate() - i);
+                                        const dateStr = d.toISOString().split('T')[0];
+
+                                        // Buscar si en ese día hubo TSS
+                                        const metricObj = metrics.history14d.find(x => x.date === dateStr);
+                                        const hasLoad = (metricObj && metricObj.tss > 0);
+                                        const dayName = d.toLocaleDateString('es', { weekday: 'short' }).substring(0, 2);
+
+                                        grid.push(
+                                            <div key={i} className="flex-1 flex flex-col items-center gap-3">
+                                                <div
+                                                    className={`w-full aspect-square rounded-2xl max-w-[56px] border flex items-center justify-center transition-all ${hasLoad ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border-emerald-500/40 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'bg-black/30 border-white/5 text-zinc-700 shadow-inner'}`}
+                                                    title={dateStr}
+                                                >
+                                                    {hasLoad ? (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0px 2px 4px rgba(16,185,129,0.5))' }}><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                    ) : (
+                                                        <span className="w-2 h-2 rounded-full bg-zinc-800"></span>
+                                                    )}
+                                                </div>
+                                                <span className={`text-[11px] font-bold uppercase tracking-wider ${hasLoad ? 'text-emerald-500/80' : 'text-zinc-600'}`}>{dayName}</span>
+                                            </div>
+                                        );
+                                    }
+                                    return grid;
+                                })()}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            )}
 
             {/* Layout Principal Grid: 1 columna en movil, 3 columnas asimétricas en PC */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 w-full flex-1">
