@@ -106,22 +106,26 @@ export function OnboardingWizard({ session, initialProfile, onComplete }: Onboar
             delete (profileData as any).diasDisponibles;
             delete (profileData as any).horasPorDia;
 
-            const { error: profileError } = await supabase
-                .from('athlete_profiles')
-                .upsert(profileData);
+            if (session.user.id !== 'offline-demo-user') {
+                const { error: profileError } = await supabase
+                    .from('athlete_profiles')
+                    .upsert(profileData);
 
-            if (profileError) throw profileError;
+                if (profileError) throw profileError;
 
-            // Push weight to history track
-            // Check if weight actually changed logic is omitted here because it's first onboarding, just insert.
-            const { error: weightError } = await supabase
-                .from('weight_history')
-                .insert({
-                    user_id: session.user.id,
-                    peso_kg: Number(formData.pesoActual)
-                });
+                // Push weight to history track
+                // Check if weight actually changed logic is omitted here because it's first onboarding, just insert.
+                const { error: weightError } = await supabase
+                    .from('weight_history')
+                    .insert({
+                        user_id: session.user.id,
+                        peso_kg: Number(formData.pesoActual)
+                    });
 
-            if (weightError) throw weightError;
+                if (weightError) throw weightError;
+            } else {
+                console.log("[Demo Mode] Bypassed saving profile and weight history to Supabase");
+            }
 
             // Trigger parent refresh & redirect
             await onComplete();

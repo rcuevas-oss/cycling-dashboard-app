@@ -64,22 +64,30 @@ export function AthleteProfile({ session, profile, onDataChanged }: { session: S
             delete (profileData as any).ftpActual;
             delete (profileData as any).pesoActual;
 
-            const { error: profileError } = await supabase
-                .from('athlete_profiles')
-                .upsert(profileData);
+            if (session.user.id !== 'offline-demo-user') {
+                const { error: profileError } = await supabase
+                    .from('athlete_profiles')
+                    .upsert(profileData);
 
-            if (profileError) throw profileError;
+                if (profileError) throw profileError;
+            } else {
+                console.log("[Demo Mode] Bypassed saving profile to Supabase");
+            }
 
             // 2. Si el peso cambió, inyectar automáticamente al historial biométrico (Data AI)
             if (formData.pesoActual !== '' && formData.pesoActual !== originalPeso.toString()) {
-                const { error: weightError } = await supabase
-                    .from('weight_history')
-                    .insert({
-                        user_id: session.user.id,
-                        peso_kg: Number(formData.pesoActual)
-                    });
+                if (session.user.id !== 'offline-demo-user') {
+                    const { error: weightError } = await supabase
+                        .from('weight_history')
+                        .insert({
+                            user_id: session.user.id,
+                            peso_kg: Number(formData.pesoActual)
+                        });
 
-                if (weightError) throw weightError;
+                    if (weightError) throw weightError;
+                } else {
+                    console.log("[Demo Mode] Bypassed saving weight history to Supabase");
+                }
                 setOriginalPeso(Number(formData.pesoActual)); // Reset param comparison para que no lo mande doble si vuelve a clickear
             }
 
