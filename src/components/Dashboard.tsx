@@ -46,7 +46,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                     const tTime = (value: string | undefined | null) => {
                         if (value === undefined || value === null || value.toString().trim() === '') return null;
                         const cleaned = value.toString().replace(/"/g, '').trim();
-                        if (/^[-:\s]+$/.test(cleaned)) return null;
+                        if (/^[\s:-]+$/.test(cleaned)) return null;
                         return cleaned;
                     };
 
