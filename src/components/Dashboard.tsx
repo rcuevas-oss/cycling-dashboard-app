@@ -42,10 +42,19 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                     const text = event.target?.result as string;
                     if (!text) return resolve([]);
 
+                    // Helper para strings de tiempo (ignora cadenas con solo guiones o dos puntos como "--:--")
+                    const tTime = (value: string | undefined | null) => {
+                        if (value === undefined || value === null || value.toString().trim() === '') return null;
+                        const cleaned = value.toString().replace(/"/g, '').trim();
+                        if (/^[-:\s]+$/.test(cleaned)) return null;
+                        return cleaned;
+                    };
+
                     // Helper para parsear números con manejo de formatos regionales
                     const tNum = (value: string | undefined, metricType: 'integer' | 'decimal') => {
-                        if (value === undefined || value === null || value.trim() === '' || value === '--') return null;
+                        if (value === undefined || value === null || value.trim() === '') return null;
                         let cleaned = value.toString().replace(/"/g, '').trim();
+                        if (/^[-:\s]+$/.test(cleaned)) return null; // Ignorar "--", "--:--", etc.
 
                         if (cleaned === '') return null;
 
@@ -168,9 +177,9 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                                 }
 
                                 let duration_minutes = null;
-                                const rawDuration = (idxMap.duration !== undefined && dataTokens[idxMap.duration]) ? dataTokens[idxMap.duration].toString().replace(/"/g, '').trim() : '';
+                                const rawDuration = tTime(idxMap.duration !== undefined ? dataTokens[idxMap.duration] : undefined);
 
-                                if (rawDuration && rawDuration !== '--') {
+                                if (rawDuration) {
                                     const timeParts = rawDuration.split(':').map(Number);
                                     if (timeParts.length >= 3) {
                                         // hh:mm:ss o hh:mm:ss.0
@@ -181,7 +190,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                                     }
                                 }
 
-                                const rawTiempo = (idxMap.duration !== undefined && dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--') ? dataTokens[idxMap.duration].toString().replace(/"/g, '').trim() : null;
+                                const rawTiempo = rawDuration;
 
                                 const act = {
                                     titulo: (idxMap.title !== undefined && dataTokens[idxMap.title]) ? dataTokens[idxMap.title].toString().replace(/"/g, '').trim() : null,
@@ -191,9 +200,9 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                                     duration_minutes: duration_minutes,
 
                                     tiempo: rawTiempo,
-                                    tiempo_movimiento: (idxMap.t_mov !== undefined && dataTokens[idxMap.t_mov] && dataTokens[idxMap.t_mov] !== '--') ? dataTokens[idxMap.t_mov].toString().replace(/"/g, '').trim() : null,
-                                    tiempo_transcurrido: (idxMap.t_transcur !== undefined && dataTokens[idxMap.t_transcur] && dataTokens[idxMap.t_transcur] !== '--') ? dataTokens[idxMap.t_transcur].toString().replace(/"/g, '').trim() : null,
-                                    mejor_vuelta: (idxMap.lap_best !== undefined && dataTokens[idxMap.lap_best] && dataTokens[idxMap.lap_best] !== '--') ? dataTokens[idxMap.lap_best].toString().replace(/"/g, '').trim() : null,
+                                    tiempo_movimiento: tTime(idxMap.t_mov !== undefined ? dataTokens[idxMap.t_mov] : undefined),
+                                    tiempo_transcurrido: tTime(idxMap.t_transcur !== undefined ? dataTokens[idxMap.t_transcur] : undefined),
+                                    mejor_vuelta: tTime(idxMap.lap_best !== undefined ? dataTokens[idxMap.lap_best] : undefined),
 
                                     fc_media: tNum(idxMap.hr_mean !== undefined ? dataTokens[idxMap.hr_mean]?.toString() : undefined, 'integer'),
                                     fc_maxima: tNum(idxMap.hr_max !== undefined ? dataTokens[idxMap.hr_max]?.toString() : undefined, 'integer'),
@@ -216,7 +225,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                                     pedaladas_totales: tNum(idxMap.strokes !== undefined ? dataTokens[idxMap.strokes]?.toString() : undefined, 'integer'),
 
                                     temperatura_min: tNum(idxMap.temp_min !== undefined ? dataTokens[idxMap.temp_min]?.toString() : undefined, 'decimal'),
-                                    descompresion: (idxMap.descompresion !== undefined && dataTokens[idxMap.descompresion] && dataTokens[idxMap.descompresion] !== '--') ? dataTokens[idxMap.descompresion].toString() : null,
+                                    descompresion: tTime(idxMap.descompresion !== undefined ? dataTokens[idxMap.descompresion] : undefined),
                                     numero_vueltas: tNum(idxMap.laps !== undefined ? dataTokens[idxMap.laps]?.toString() : undefined, 'integer'),
                                     temperatura_max: tNum(idxMap.temp_max !== undefined ? dataTokens[idxMap.temp_max]?.toString() : undefined, 'decimal'),
                                     resp_media: tNum(idxMap.resp_mean !== undefined ? dataTokens[idxMap.resp_mean]?.toString() : undefined, 'integer'),
