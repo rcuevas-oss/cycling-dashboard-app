@@ -490,6 +490,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                                             labelStyle={{ color: '#a1a1aa', fontSize: '12px', marginBottom: '4px' }}
                                             formatter={(value: any) => [<span className="text-garmin-blue">{Math.round(Number(value))} TSS</span>, 'Carga']}
                                             labelFormatter={(label) => new Date(label + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                            isAnimationActive={false}
                                         />
                                         <Bar
                                             dataKey="tss"
