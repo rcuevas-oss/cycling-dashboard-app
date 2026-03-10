@@ -485,6 +485,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                                         />
                                         <Tooltip
                                             cursor={{ fill: '#27272a', opacity: 0.4 }}
+                                            wrapperStyle={{ zIndex: 100, pointerEvents: 'none' }}
                                             contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
                                             itemStyle={{ color: '#e4e4e7', fontWeight: 'bold' }}
                                             labelStyle={{ color: '#a1a1aa', fontSize: '12px', marginBottom: '4px' }}
@@ -575,6 +576,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                                             />
                                             <ReferenceLine y={0} yAxisId="left" stroke="#52525b" strokeDasharray="3 3" />
                                             <Tooltip
+                                                wrapperStyle={{ zIndex: 100, pointerEvents: 'none' }}
                                                 contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
                                                 labelStyle={{ color: '#a1a1aa', fontSize: '12px', marginBottom: '8px' }}
                                                 labelFormatter={(label) => new Date(label + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
@@ -582,6 +584,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                                                     <span className="font-bold">{Math.round(Number(value))}</span>,
                                                     <span className="uppercase text-xs tracking-wider">{String(name)}</span>
                                                 ]}
+                                                isAnimationActive={false}
                                             />
                                             <Bar yAxisId="left" dataKey="tsbDisplayed" name="TSB" barSize={8} radius={[4, 4, 4, 4]} fill="#f59e0b">
                                                 {
