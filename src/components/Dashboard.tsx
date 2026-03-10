@@ -493,19 +493,19 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
                                         />
                                         <Bar
                                             dataKey="tss"
-                                            fill="#0ea5e9"
                                             radius={[4, 4, 0, 0]}
                                             maxBarSize={40}
                                             activeBar={{ filter: 'brightness(1.2)' }}
-                                            shape={(props: any) => {
-                                                const { x, y, width, height } = props;
-                                                let color = '#0ea5e9'; // garmin-blue
-                                                if (props.payload.tss > 100) color = '#f43f5e'; // rose-500
-                                                else if (props.payload.tss > 60) color = '#f59e0b'; // amber-500
-
-                                                return <rect x={x} y={y} width={width} height={height} fill={color} rx={4} ry={4} />;
-                                            }}
-                                        />
+                                        >
+                                            {
+                                                metrics.history14d.map((entry, index) => {
+                                                    let color = '#0ea5e9'; // garmin-blue
+                                                    if (entry.tss > 100) color = '#f43f5e'; // rose-500
+                                                    else if (entry.tss > 60) color = '#f59e0b'; // amber-500
+                                                    return <Cell key={`cell-${index}`} fill={color} />;
+                                                })
+                                            }
+                                        </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
