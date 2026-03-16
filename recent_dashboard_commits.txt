@@ -1,0 +1,1578 @@
+commit f9910090c849bc0e3dab52cf935d997267506eea
+Author: Rodrigo Cuevas <grottes.rcuevas@gmail.com>
+Date:   Tue Mar 10 17:18:16 2026 -0300
+
+    fix: handle dashed interval strings on garmin csv upload
+
+diff --git a/src/components/Dashboard.tsx b/src/components/Dashboard.tsx
+index aa68577..b09c0d8 100644
+--- a/src/components/Dashboard.tsx
++++ b/src/components/Dashboard.tsx
+@@ -42,10 +42,19 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                     const text = event.target?.result as string;
+                     if (!text) return resolve([]);
+ 
++                    // Helper para strings de tiempo (ignora cadenas con solo guiones o dos puntos como "--:--")
++                    const tTime = (value: string | undefined | null) => {
++                        if (value === undefined || value === null || value.toString().trim() === '') return null;
++                        const cleaned = value.toString().replace(/"/g, '').trim();
++                        if (/^[-:\s]+$/.test(cleaned)) return null;
++                        return cleaned;
++                    };
++
+                     // Helper para parsear números con manejo de formatos regionales
+                     const tNum = (value: string | undefined, metricType: 'integer' | 'decimal') => {
+-                        if (value === undefined || value === null || value.trim() === '' || value === '--') return null;
++                        if (value === undefined || value === null || value.trim() === '') return null;
+                         let cleaned = value.toString().replace(/"/g, '').trim();
++                        if (/^[-:\s]+$/.test(cleaned)) return null; // Ignorar "--", "--:--", etc.
+ 
+                         if (cleaned === '') return null;
+ 
+@@ -168,9 +177,9 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                                 }
+ 
+                                 let duration_minutes = null;
+-                                const rawDuration = (idxMap.duration !== undefined && dataTokens[idxMap.duration]) ? dataTokens[idxMap.duration].toString().replace(/"/g, '').trim() : '';
++                                const rawDuration = tTime(idxMap.duration !== undefined ? dataTokens[idxMap.duration] : undefined);
+ 
+-                                if (rawDuration && rawDuration !== '--') {
++                                if (rawDuration) {
+                                     const timeParts = rawDuration.split(':').map(Number);
+                                     if (timeParts.length >= 3) {
+                                         // hh:mm:ss o hh:mm:ss.0
+@@ -181,7 +190,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                                     }
+                                 }
+ 
+-                                const rawTiempo = (idxMap.duration !== undefined && dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--') ? dataTokens[idxMap.duration].toString().replace(/"/g, '').trim() : null;
++                                const rawTiempo = rawDuration;
+ 
+                                 const act = {
+                                     titulo: (idxMap.title !== undefined && dataTokens[idxMap.title]) ? dataTokens[idxMap.title].toString().replace(/"/g, '').trim() : null,
+@@ -191,9 +200,9 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                                     duration_minutes: duration_minutes,
+ 
+                                     tiempo: rawTiempo,
+-                                    tiempo_movimiento: (idxMap.t_mov !== undefined && dataTokens[idxMap.t_mov] && dataTokens[idxMap.t_mov] !== '--') ? dataTokens[idxMap.t_mov].toString().replace(/"/g, '').trim() : null,
+-                                    tiempo_transcurrido: (idxMap.t_transcur !== undefined && dataTokens[idxMap.t_transcur] && dataTokens[idxMap.t_transcur] !== '--') ? dataTokens[idxMap.t_transcur].toString().replace(/"/g, '').trim() : null,
+-                                    mejor_vuelta: (idxMap.lap_best !== undefined && dataTokens[idxMap.lap_best] && dataTokens[idxMap.lap_best] !== '--') ? dataTokens[idxMap.lap_best].toString().replace(/"/g, '').trim() : null,
++                                    tiempo_movimiento: tTime(idxMap.t_mov !== undefined ? dataTokens[idxMap.t_mov] : undefined),
++                                    tiempo_transcurrido: tTime(idxMap.t_transcur !== undefined ? dataTokens[idxMap.t_transcur] : undefined),
++                                    mejor_vuelta: tTime(idxMap.lap_best !== undefined ? dataTokens[idxMap.lap_best] : undefined),
+ 
+                                     fc_media: tNum(idxMap.hr_mean !== undefined ? dataTokens[idxMap.hr_mean]?.toString() : undefined, 'integer'),
+                                     fc_maxima: tNum(idxMap.hr_max !== undefined ? dataTokens[idxMap.hr_max]?.toString() : undefined, 'integer'),
+@@ -216,7 +225,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                                     pedaladas_totales: tNum(idxMap.strokes !== undefined ? dataTokens[idxMap.strokes]?.toString() : undefined, 'integer'),
+ 
+                                     temperatura_min: tNum(idxMap.temp_min !== undefined ? dataTokens[idxMap.temp_min]?.toString() : undefined, 'decimal'),
+-                                    descompresion: (idxMap.descompresion !== undefined && dataTokens[idxMap.descompresion] && dataTokens[idxMap.descompresion] !== '--') ? dataTokens[idxMap.descompresion].toString() : null,
++                                    descompresion: tTime(idxMap.descompresion !== undefined ? dataTokens[idxMap.descompresion] : undefined),
+                                     numero_vueltas: tNum(idxMap.laps !== undefined ? dataTokens[idxMap.laps]?.toString() : undefined, 'integer'),
+                                     temperatura_max: tNum(idxMap.temp_max !== undefined ? dataTokens[idxMap.temp_max]?.toString() : undefined, 'decimal'),
+                                     resp_media: tNum(idxMap.resp_mean !== undefined ? dataTokens[idxMap.resp_mean]?.toString() : undefined, 'integer'),
+
+commit 1ff44154fc50ca58c796127870294766f3831ac3
+Author: Rodrigo Cuevas <grottes.rcuevas@gmail.com>
+Date:   Tue Mar 10 13:22:44 2026 -0300
+
+    chore: update PMC metrics logic, add AI training planner, and offline mode fixes
+
+diff --git a/src/components/Dashboard.tsx b/src/components/Dashboard.tsx
+index 57895e3..aa68577 100644
+--- a/src/components/Dashboard.tsx
++++ b/src/components/Dashboard.tsx
+@@ -1,7 +1,9 @@
+-import React, { useState, useEffect } from 'react';
++import React, { useState, useEffect, useMemo } from 'react';
+ import { supabase } from '../lib/supabase';
+ import Papa from 'papaparse';
+ import { Session } from '@supabase/supabase-js';
++import { getDailyLoads, calculatePMC, getConsistencyLast7Days, getZoneDistribution, getLoadLastNDays, getSessionsLast7Days } from '../lib/metricsUtils';
++import { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, Area, ComposedChart, ReferenceLine, CartesianGrid } from 'recharts';
+ 
+ export function Dashboard({ session, activities, onDataChanged }: { session: Session, activities: any[], onDataChanged: () => Promise<void> }) {
+     const [file, setFile] = useState<File | null>(null);
+@@ -295,6 +297,55 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+         }
+     };
+ 
++    // --- CÁLCULO DE MÉTRICAS FISIOLÓGICAS (Memoizadas) ---
++    const metrics = useMemo(() => {
++        if (!activities || activities.length === 0) return null;
++
++        const dailyLoads = getDailyLoads(activities);
++        const pmcData = calculatePMC(dailyLoads);
++        const pmcHistory = pmcData.results;
++
++        // Métricas "Actuales" (El verdadero último día con historial)
++        const todayPMC = pmcHistory[pmcHistory.length - 1] || { ctlDisplayed: 0, atlDisplayed: 0, tsbDisplayed: 0 };
++
++        const consistency = getConsistencyLast7Days(dailyLoads);
++        const zones = getZoneDistribution(activities, 30);
++        const load7d = getLoadLastNDays(dailyLoads, 7);
++        const load28d = getLoadLastNDays(dailyLoads, 28);
++        const sessionsThisWeek = getSessionsLast7Days(activities);
++
++        return {
++            ctl: todayPMC.ctlDisplayed || 0,
++            atl: todayPMC.atlDisplayed || 0,
++            tsb: todayPMC.tsbDisplayed || 0,
++            history14d: pmcHistory.slice(-14), // Array de últimos 14 días para el gráfico
++            maturityStatus: pmcData.status,
++            daysAvailable: pmcData.daysAvailable,
++            readinessScore: pmcData.readinessScore,
++            consistency,
++            zones,
++            load7d,
++            load28d,
++            sessionsThisWeek
++        };
++    }, [activities]);
++
++    // Helper visual para TSB (Más prudente según feedback)
++    const getFormColor = (tsb: number) => {
++        if (tsb > 25) return "text-sky-400"; // Muy fresco
++        if (tsb >= 10) return "text-emerald-400"; // Fresco
++        if (tsb >= -10) return "text-garmin-blue"; // Estable
++        if (tsb >= -30) return "text-amber-400"; // Fatigado
++        return "text-rose-500"; // Muy fatigado
++    };
++    const getFormDesc = (tsb: number) => {
++        if (tsb > 25) return "Muy Fresco";
++        if (tsb >= 10) return "Fresco / Tapering";
++        if (tsb >= -10) return "Estable / Óptimo";
++        if (tsb >= -30) return "Fatigado / Carga";
++        return "Muy Fatigado / Riesgo";
++    };
++
+     return (
+         <div className="w-full text-left flex flex-col h-full gap-6 lg:gap-8">
+             {/* Cabecera Principal */}
+@@ -311,6 +362,305 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                 </button>
+             </div>
+ 
++            {/* PANEL ANALÍTICO DE MÉTRICAS FISIOLÓGICAS */}
++            {metrics && (
++                <div className="flex flex-col gap-6 w-full">
++
++                    {/* FILA 1: TARJETAS RESUMEN (Carga 7d, Carga 28d, Fatiga, Forma, Sesiones) */}
++                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
++                        {/* Carga 7d */}
++                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-3xl flex flex-col justify-between group hover:border-zinc-700/80 transition-all shadow-xl hover:shadow-2xl relative overflow-hidden backdrop-blur-sm cursor-default">
++                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
++                            <span className="text-[11px] font-bold text-zinc-500 tracking-widest mb-2">CARGA 7D</span>
++                            <div className="flex items-baseline gap-2">
++                                <span className="text-3xl font-black text-white group-hover:scale-105 origin-left transition-transform">{metrics.load7d}</span>
++                                <span className="text-[10px] text-zinc-500 font-mono">tss</span>
++                            </div>
++                        </div>
++
++                        {/* Carga 28d */}
++                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-3xl flex flex-col justify-between group hover:border-zinc-700/80 transition-all shadow-xl hover:shadow-2xl relative overflow-hidden backdrop-blur-sm cursor-default">
++                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
++                            <span className="text-[11px] font-bold text-zinc-500 tracking-widest mb-2">CARGA 28D</span>
++                            <div className="flex items-baseline gap-2">
++                                <span className="text-3xl font-black text-white group-hover:scale-105 origin-left transition-transform">{metrics.load28d}</span>
++                                <span className="text-[10px] text-zinc-500 font-mono">tss</span>
++                            </div>
++                        </div>
++
++                        {/* Fatiga Actual (ATL) */}
++                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-3xl flex flex-col justify-between group hover:border-rose-500/30 transition-all shadow-xl hover:shadow-rose-500/10 relative overflow-hidden backdrop-blur-sm cursor-default">
++                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-rose-500/20 to-transparent"></div>
++                            <span className="text-[11px] font-bold text-zinc-500 tracking-widest mb-2 flex justify-between items-center w-full">
++                                FATIGA (ATL)
++                                {metrics.maturityStatus === 'provisional' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500/70">Est.</span>}
++                            </span>
++                            <div className="flex items-baseline gap-2">
++                                {metrics.maturityStatus === 'insufficient' ? (
++                                    <span className="text-xl font-black text-zinc-600">--</span>
++                                ) : (
++                                    <>
++                                        <span className="text-3xl font-black text-rose-400 group-hover:text-rose-300 transition-colors drop-shadow-[0_0_8px_rgba(251,113,133,0.3)]">{metrics.atl}</span>
++                                        <span className="text-[10px] text-zinc-500 font-mono">tss/d</span>
++                                    </>
++                                )}
++                            </div>
++                        </div>
++
++                        {/* Forma Actual (TSB) */}
++                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-3xl flex flex-col justify-between group relative overflow-hidden shadow-xl hover:shadow-sky-500/10 hover:border-sky-500/30 transition-all cursor-default">
++                            <div className="absolute inset-0 opacity-10 blur-2xl transition-all group-hover:opacity-20 bg-gradient-to-br from-garmin-blue to-emerald-500 pointer-events-none"></div>
++                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-sky-500/20 to-transparent"></div>
++                            <span className="text-[11px] font-bold text-zinc-500 tracking-widest mb-2 relative z-10 flex justify-between items-center w-full">
++                                FORMA (TSB)
++                                {metrics.maturityStatus === 'provisional' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500/70">Est.</span>}
++                            </span>
++
++                            {metrics.maturityStatus === 'insufficient' ? (
++                                <div className="flex flex-col justify-center h-full">
++                                    <span className="text-[10px] text-zinc-500 leading-tight">Analizando historial...<br />({metrics.daysAvailable}/20 días)</span>
++                                    <div className="w-full h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
++                                        <div className="h-full bg-zinc-600 rounded-full" style={{ width: `${(metrics.daysAvailable / 20) * 100}%` }}></div>
++                                    </div>
++                                </div>
++                            ) : (
++                                <>
++                                    <div className="flex items-baseline gap-2 relative z-10">
++                                        <span className={`text-3xl font-black ${getFormColor(metrics.tsb)} drop-shadow-md`}>{metrics.tsb > 0 ? '+' : ''}{metrics.tsb}</span>
++                                    </div>
++                                    <span className={`text-[10px] font-bold mt-1 uppercase relative z-10 ${getFormColor(metrics.tsb)} opacity-80`}>{getFormDesc(metrics.tsb)}</span>
++                                </>
++                            )}
++                        </div>
++
++                        {/* Sesiones de la Semana */}
++                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-3xl flex flex-col justify-between group hover:border-emerald-500/30 transition-all shadow-xl hover:shadow-emerald-500/10 lg:col-span-1 md:col-span-2 col-span-2 relative overflow-hidden backdrop-blur-sm cursor-default">
++                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent"></div>
++                            <span className="text-[11px] font-bold text-zinc-500 tracking-widest mb-2">SESIONES (7D)</span>
++                            <div className="flex items-baseline gap-2">
++                                <span className="text-3xl font-black text-emerald-400 group-hover:text-emerald-300 transition-colors drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]">{metrics.sessionsThisWeek}</span>
++                                <span className="text-[10px] text-zinc-500 font-mono">actividades</span>
++                            </div>
++                        </div>
++                    </div>
++
++                    {/* FILA 2: GRÁFICOS (Carga Diaria, PMC, Zonas, Consistencia) */}
++                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
++
++                        {/* 1. GRÁFICO CARGA DIARIA (Últimos 14 días en barras) */}
++                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-6 rounded-3xl flex flex-col shadow-2xl relative overflow-hidden group/chart cursor-default">
++                            {/* Decorative background glow */}
++                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent"></div>
++
++                            <div className="mb-6 flex justify-between items-center z-10">
++                                <h4 className="text-xs font-bold text-zinc-400 tracking-widest">CARGA DIARIA (14D)</h4>
++                            </div>
++
++                            <div className="flex-1 w-full mt-4" style={{ minHeight: '200px' }}>
++                                <ResponsiveContainer width="100%" height="100%">
++                                    <BarChart data={metrics.history14d} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
++                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3f3f46" strokeOpacity={0.4} />
++                                        <XAxis
++                                            dataKey="date"
++                                            tickFormatter={(val) => new Date(val + 'T00:00:00').toLocaleDateString('es', { weekday: 'short' }).substring(0, 2).toUpperCase()}
++                                            axisLine={false}
++                                            tickLine={false}
++                                            tick={{ fill: '#71717a', fontSize: 10, fontWeight: 600 }}
++                                            dy={10}
++                                        />
++                                        <YAxis
++                                            axisLine={false}
++                                            tickLine={false}
++                                            tick={{ fill: '#71717a', fontSize: 10 }}
++                                            tickCount={4}
++                                        />
++                                        <Tooltip
++                                            cursor={{ fill: '#27272a', opacity: 0.4 }}
++                                            contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
++                                            itemStyle={{ color: '#e4e4e7', fontWeight: 'bold' }}
++                                            labelStyle={{ color: '#a1a1aa', fontSize: '12px', marginBottom: '4px' }}
++                                            formatter={(value: any) => [<span className="text-garmin-blue">{Math.round(Number(value))} TSS</span>, 'Carga']}
++                                            labelFormatter={(label) => new Date(label + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
++                                        />
++                                        <Bar
++                                            dataKey="tss"
++                                            fill="#0ea5e9"
++                                            radius={[4, 4, 0, 0]}
++                                            maxBarSize={40}
++                                            activeBar={{ filter: 'brightness(1.2)' }}
++                                            shape={(props: any) => {
++                                                const { x, y, width, height } = props;
++                                                let color = '#0ea5e9'; // garmin-blue
++                                                if (props.payload.tss > 100) color = '#f43f5e'; // rose-500
++                                                else if (props.payload.tss > 60) color = '#f59e0b'; // amber-500
++
++                                                return <rect x={x} y={y} width={width} height={height} fill={color} rx={4} ry={4} />;
++                                            }}
++                                        />
++                                    </BarChart>
++                                </ResponsiveContainer>
++                            </div>
++                        </div>
++
++                        {/* 2. GRÁFICO PMC (CTL, ATL, TSB renderizados vía SVG nativo) */}
++                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-6 rounded-3xl flex flex-col relative overflow-hidden shadow-2xl">
++                            {/* Decorative background glow */}
++                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-900/50 to-transparent"></div>
++
++                            <div className="mb-4 flex flex-col sm:flex-row justify-between sm:items-center z-10 relative gap-2">
++                                <div className="flex flex-col gap-1">
++                                    <h4 className="text-xs font-bold text-zinc-400 tracking-widest flex items-center gap-2">
++                                        DINÁMICA DE CARGA (PMC 14D)
++                                        {metrics.maturityStatus === 'provisional' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">Calibrando ({metrics.daysAvailable}/42d)</span>}
++                                        {metrics.maturityStatus === 'calibrated' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Calibrado</span>}
++                                    </h4>
++                                    {metrics.maturityStatus === 'insufficient' ? (
++                                        <p className="text-[10px] text-zinc-500 max-w-sm">Gráfico en construcción. Necesitamos al menos 20 días de historial para proyectar la carga cardiovascular. Días actuales: {metrics.daysAvailable}</p>
++                                    ) : null}
++                                </div>
++
++                                {metrics.maturityStatus !== 'insufficient' && (
++                                    <div className="flex gap-4 text-xs font-semibold bg-black/20 px-3 py-1.5 rounded-full border border-white/5">
++                                        <span className="text-sky-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-sky-400"></span>CTL</span>
++                                        <span className="text-rose-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-400"></span>ATL</span>
++                                        <span className="text-amber-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400"></span>TSB</span>
++                                    </div>
++                                )}
++                            </div>
++
++                            <div className="flex-1 w-full mt-4" style={{ minHeight: '240px' }}>
++                                {metrics.maturityStatus === 'insufficient' ? (
++                                    <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/40">
++                                        <svg className="w-8 h-8 text-zinc-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
++                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
++                                        </svg>
++                                        <p className="text-sm font-medium text-zinc-400">Recopilando datos iniciales</p>
++                                        <div className="w-48 h-1.5 bg-zinc-800 rounded-full mt-4 overflow-hidden">
++                                            <div className="h-full bg-garmin-blue rounded-full transition-all duration-1000" style={{ width: `${(metrics.daysAvailable / 20) * 100}%` }}></div>
++                                        </div>
++                                    </div>
++                                ) : (
++                                    <ResponsiveContainer width="100%" height="100%">
++                                        <ComposedChart data={metrics.history14d} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
++                                            <defs>
++                                                <linearGradient id="colorCtl" x1="0" y1="0" x2="0" y2="1">
++                                                    <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3} />
++                                                    <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
++                                                </linearGradient>
++                                            </defs>
++                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3f3f46" strokeOpacity={0.4} />
++                                            <XAxis
++                                                dataKey="date"
++                                                tickFormatter={(val) => new Date(val + 'T00:00:00').toLocaleDateString('es', { weekday: 'short' }).substring(0, 2).toUpperCase()}
++                                                axisLine={false}
++                                                tickLine={false}
++                                                tick={{ fill: '#71717a', fontSize: 10, fontWeight: 600 }}
++                                                dy={10}
++                                            />
++                                            <YAxis
++                                                yAxisId="left"
++                                                axisLine={false}
++                                                tickLine={false}
++                                                tick={{ fill: '#71717a', fontSize: 10 }}
++                                            />
++                                            <ReferenceLine y={0} yAxisId="left" stroke="#52525b" strokeDasharray="3 3" />
++                                            <Tooltip
++                                                contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
++                                                labelStyle={{ color: '#a1a1aa', fontSize: '12px', marginBottom: '8px' }}
++                                                labelFormatter={(label) => new Date(label + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
++                                                formatter={(value: any, name: any) => [
++                                                    <span className="font-bold">{Math.round(Number(value))}</span>,
++                                                    <span className="uppercase text-xs tracking-wider">{String(name)}</span>
++                                                ]}
++                                            />
++                                            <Bar yAxisId="left" dataKey="tsbDisplayed" name="TSB" barSize={8} radius={[4, 4, 4, 4]} fill="#f59e0b">
++                                                {
++                                                    metrics.history14d.map((entry, index) => {
++                                                        const color = entry.tsbDisplayed > 10 ? '#34d399' : entry.tsbDisplayed > 0 ? '#10b981' : entry.tsbDisplayed < -20 ? '#f43f5e' : '#f59e0b';
++                                                        return <Cell key={`cell-${index}`} fill={color} />;
++                                                    })
++                                                }
++                                            </Bar>
++                                            <Area yAxisId="left" type="monotone" dataKey="ctlDisplayed" name="CTL" stroke="#38bdf8" strokeWidth={3} fillOpacity={1} fill="url(#colorCtl)" activeDot={{ r: 6, strokeWidth: 0, fill: '#38bdf8' }} />
++                                            <Area yAxisId="left" type="monotone" dataKey="atlDisplayed" name="ATL" stroke="#fb7185" strokeWidth={2} fill="none" activeDot={{ r: 4, strokeWidth: 0, fill: '#fb7185' }} />
++                                        </ComposedChart>
++                                    </ResponsiveContainer>
++                                )}
++                            </div>
++                        </div>
++
++                        {/* 3. GRÁFICO DISTRIBUCIÓN POR ZONAS */}
++                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-6 rounded-3xl flex flex-col justify-center shadow-2xl">
++                            <h4 className="text-xs font-bold text-zinc-400 tracking-widest mb-6">DISTRIBUCIÓN POR ZONAS (30D)</h4>
++                            <div className="w-full h-14 flex rounded-2xl overflow-hidden gap-1.5 mt-2 mb-6">
++                                {metrics.zones.base > 0 && (
++                                    <div className="bg-gradient-to-r from-sky-600 to-sky-400 h-full flex items-center justify-center transition-all hover:brightness-110 shadow-[inner_0_0_10px_rgba(255,255,255,0.1)] rounded-xl" style={{ width: `${metrics.zones.base}%` }} title={`Base/Aeróbico: ${metrics.zones.base}%`}>
++                                        {metrics.zones.base > 15 && <span className="text-[11px] font-black text-white drop-shadow-md">{metrics.zones.base}%</span>}
++                                    </div>
++                                )}
++                                {metrics.zones.umbral > 0 && (
++                                    <div className="bg-gradient-to-r from-amber-500 to-amber-300 h-full flex items-center justify-center transition-all hover:brightness-110 shadow-[inner_0_0_10px_rgba(255,255,255,0.1)] rounded-xl" style={{ width: `${metrics.zones.umbral}%` }} title={`Umbral/Tempo: ${metrics.zones.umbral}%`}>
++                                        {metrics.zones.umbral > 15 && <span className="text-[11px] font-black text-amber-950 drop-shadow-sm">{metrics.zones.umbral}%</span>}
++                                    </div>
++                                )}
++                                {metrics.zones.vo2 > 0 && (
++                                    <div className="bg-gradient-to-r from-rose-600 to-rose-400 h-full flex items-center justify-center transition-all hover:brightness-110 shadow-[inner_0_0_10px_rgba(255,255,255,0.1)] rounded-xl" style={{ width: `${metrics.zones.vo2}%` }} title={`VO2/Anaeróbico: ${metrics.zones.vo2}%`}>
++                                        {metrics.zones.vo2 > 15 && <span className="text-[11px] font-black text-white drop-shadow-md">{metrics.zones.vo2}%</span>}
++                                    </div>
++                                )}
++                            </div>
++                            <div className="flex justify-between w-full text-xs font-medium text-zinc-400 mt-auto bg-black/20 p-3 rounded-xl border border-white/5">
++                                <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gradient-to-tr from-sky-600 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]"></span> Z1/Z2 (Base)</span>
++                                <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></span> Z3/Z4 (Umbral)</span>
++                                <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gradient-to-tr from-rose-600 to-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></span> Z5+ (VO2 Max)</span>
++                            </div>
++                        </div>
++
++                        {/* 4. GRÁFICO CONSISTENCIA SEMANAL */}
++                        <div className="bg-zinc-900/80 border border-zinc-800/80 p-6 rounded-3xl flex flex-col justify-center shadow-2xl">
++                            <h4 className="text-xs font-bold text-zinc-400 tracking-widest mb-6">CONSISTENCIA SEMANAL</h4>
++                            <div className="flex justify-between items-center w-full gap-2 lg:gap-3 mt-auto">
++                                {/* Generar historial de los últimos 7 días */}
++                                {(() => {
++                                    const grid = [];
++                                    const totalDays = 7;
++                                    const today = new Date();
++
++                                    for (let i = totalDays - 1; i >= 0; i--) {
++                                        const d = new Date(today);
++                                        d.setDate(today.getDate() - i);
++                                        const dateStr = d.toISOString().split('T')[0];
++
++                                        // Buscar si en ese día hubo TSS
++                                        const metricObj = metrics.history14d.find(x => x.date === dateStr);
++                                        const hasLoad = (metricObj && metricObj.tss > 0);
++                                        const dayName = d.toLocaleDateString('es', { weekday: 'short' }).substring(0, 2);
++
++                                        grid.push(
++                                            <div key={i} className="flex-1 flex flex-col items-center gap-3">
++                                                <div
++                                                    className={`w-full aspect-square rounded-2xl max-w-[56px] border flex items-center justify-center transition-all ${hasLoad ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border-emerald-500/40 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'bg-black/30 border-white/5 text-zinc-700 shadow-inner'}`}
++                                                    title={dateStr}
++                                                >
++                                                    {hasLoad ? (
++                                                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0px 2px 4px rgba(16,185,129,0.5))' }}><polyline points="20 6 9 17 4 12"></polyline></svg>
++                                                    ) : (
++                                                        <span className="w-2 h-2 rounded-full bg-zinc-800"></span>
++                                                    )}
++                                                </div>
++                                                <span className={`text-[11px] font-bold uppercase tracking-wider ${hasLoad ? 'text-emerald-500/80' : 'text-zinc-600'}`}>{dayName}</span>
++                                            </div>
++                                        );
++                                    }
++                                    return grid;
++                                })()}
++                            </div>
++                        </div>
++
++                    </div>
++                </div>
++            )}
++
+             {/* Layout Principal Grid: 1 columna en movil, 3 columnas asimétricas en PC */}
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 w-full flex-1">
+ 
+
+commit 73cbb69d244d3dba10b618d288a33f1ea7044a03
+Author: Rodrigo Cuevas <grottes.rcuevas@gmail.com>
+Date:   Thu Mar 5 20:18:54 2026 -0300
+
+    Fix TSS decimal parsing, implement fuzzy column matching, and extract Activity Title
+
+diff --git a/src/components/Dashboard.tsx b/src/components/Dashboard.tsx
+index 46ddc46..57895e3 100644
+--- a/src/components/Dashboard.tsx
++++ b/src/components/Dashboard.tsx
+@@ -1,5 +1,6 @@
+ import React, { useState, useEffect } from 'react';
+ import { supabase } from '../lib/supabase';
++import Papa from 'papaparse';
+ import { Session } from '@supabase/supabase-js';
+ 
+ export function Dashboard({ session, activities, onDataChanged }: { session: Session, activities: any[], onDataChanged: () => Promise<void> }) {
+@@ -39,74 +40,11 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                     const text = event.target?.result as string;
+                     if (!text) return resolve([]);
+ 
+-                    const lines = text.split('\n');
+-                    if (lines.length < 2) return resolve([]);
++                    // Helper para parsear números con manejo de formatos regionales
++                    const tNum = (value: string | undefined, metricType: 'integer' | 'decimal') => {
++                        if (value === undefined || value === null || value.trim() === '' || value === '--') return null;
++                        let cleaned = value.toString().replace(/"/g, '').trim();
+ 
+-                    const activitiesToInsert = [];
+-
+-                    // --- NUEVO MAPEO DINÁMICO DE CABECERAS ---
+-                    const rawHeaders = lines[0].toLowerCase();
+-
+-                    // Detectar el delimitador (, ; o tabulador) basándonos en la primera línea.
+-                    let delimiter = ',';
+-                    const commaCount = (lines[0].match(/,/g) || []).length;
+-                    const semicolonCount = (lines[0].match(/;/g) || []).length;
+-                    const tabCount = (lines[0].match(/\t/g) || []).length;
+-
+-                    if (semicolonCount > commaCount && semicolonCount > tabCount) {
+-                        delimiter = ';';
+-                    } else if (tabCount > commaCount && tabCount > semicolonCount) {
+-                        delimiter = '\t';
+-                    }
+-
+-                    // Crear regex dinámica que respete el delimitador exceptuando cuando está dentro de comillas "".
+-                    const splitRegex = new RegExp(`${delimiter}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
+-
+-                    const headers = rawHeaders.split(splitRegex).map(h => h.trim().replace(/^"|"$/g, ''));
+-
+-                    const findIdx = (keywords: string[], fallback: number) => {
+-                        const idx = headers.findIndex(h => keywords.some(kw => h.includes(kw)));
+-                        return idx === -1 ? fallback : idx;
+-                    };
+-
+-                    const idxMap: Record<string, number> = {
+-                        date: findIdx(['fecha', 'date', 'tiempo', 'time'], 1),
+-                        duration: findIdx(['tiempo', 'time', 'duración', 'duration'], 6),
+-                        dist: findIdx(['distancia', 'distance'], 4),
+-                        cal: findIdx(['calor', 'calorie'], 5),
+-                        hr_mean: findIdx(['fc media', 'avg hr', 'mean hr', 'frecuencia card'], 12),
+-                        hr_max: findIdx(['fc m', 'fc max', 'max hr'], 13),
+-                        cad_mean: findIdx(['cadencia media', 'avg cadence'], 14),
+-                        cad_max: findIdx(['cadencia m', 'max cadence'], 15),
+-                        np: findIdx(['np', 'potencia normalizada', 'normalized power'], 16),
+-                        tss: findIdx(['tss', 'training stress score'], 17),
+-                        p20: findIdx(['20 min', '20min'], 18),
+-                        p_mean: findIdx(['potencia media', 'avg power'], 19),
+-                        p_max: findIdx(['potencia m', 'max power'], 20),
+-                        strokes: findIdx(['pedaladas', 'strokes'], 21),
+-                        temp_min: findIdx(['temp. min', 'temp. mín', 'min temp'], 22),
+-                        descompresion: findIdx(['descompresi'], 23),
+-                        laps: findIdx(['vueltas', 'laps'], 25),
+-                        temp_max: findIdx(['temp. max', 'temp. máx', 'max temp'], 26),
+-                        resp_mean: findIdx(['resp. media', 'avg resp'], 27),
+-                        resp_min: findIdx(['resp. min', 'resp. mín', 'min resp'], 28),
+-                        resp_max: findIdx(['resp. max', 'resp. máx', 'max resp'], 29),
+-                        t_mov: findIdx(['tiempo en movimiento', 'moving time', 'tiempo mov'], 30),
+-                        t_transcur: findIdx(['tiempo transcurrido', 'elapsed time'], 31),
+-                        lap_best: findIdx(['mejor vuelta', 'best lap'], 24),
+-                        te_aer: findIdx(['te aer', 'aerobic te'], 9),
+-                        vel_mean: findIdx(['velocidad media', 'avg speed'], 10),
+-                        vel_max: findIdx(['velocidad m', 'max speed'], 11),
+-                        asc_tot: findIdx(['ascenso', 'elev gain', 'total ascent'], 12),
+-                        desc_tot: findIdx(['descenso', 'elev loss', 'total descent'], 13),
+-                        alt_min: findIdx(['altura min', 'altura mín', 'min elev'], 32),
+-                        alt_max: findIdx(['altura max', 'altura máx', 'max elev'], 33),
+-                    };
+-
+-                    const tNum = (val: string | undefined, metricType: 'auto' | 'decimal' | 'integer' = 'auto') => {
+-                        if (!val || val === '--' || val === '') return null;
+-
+-                        let cleaned = val.replace(/^"|"$/g, '').trim();
+                         if (cleaned === '') return null;
+ 
+                         if (metricType === 'integer') {
+@@ -123,7 +61,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                                 // "36,36" -> "36.36" or "36.36" -> "36.36"
+                                 cleaned = cleaned.replace(',', '.');
+                             }
+-                        } else {
++                        } else { // This 'else' branch seems to be a fallback for 'decimal' or a more general case
+                             if (cleaned.includes(',') && cleaned.includes('.')) {
+                                 if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
+                                     cleaned = cleaned.replace(/,/g, '');
+@@ -141,112 +79,163 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+ 
+                         const num = Number(cleaned);
+                         return isNaN(num) ? null : num;
+-                    }
+-
+-                    // Iterar por todas las líneas saltando la cabecera
+-                    for (let i = 1; i < lines.length; i++) {
+-                        const line = lines[i].trim();
+-                        if (!line || line.startsWith('"Tipo de actividad')) continue;
+-
+-                        const dataTokens = line.split(splitRegex).map(t => t.trim().replace(/^"|"$/g, ''));
+-
+-                        if (dataTokens.length < 10) continue;
+-
+-                        let fecha = null;
+-                        if (dataTokens[idxMap.date]) {
+-                            let dateStr = dataTokens[idxMap.date].replace(/"/g, '').trim();
+-
+-                            // Fix DD/MM/YYYY into MM/DD/YYYY for native JS parsing
+-                            const isDDMMYYYY = /^(\d{2})[-/](\d{2})[-/](\d{4})/.test(dateStr);
+-                            if (isDDMMYYYY) {
+-                                dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$2/$1/$3');
+-                            }
+-
+-                            // Try to parse the date
+-                            let parseDate = new Date(dateStr);
++                    };
+ 
+-                            // Si sigue fallando, intentar un parseo agresivo extrayendo números
+-                            if (isNaN(parseDate.getTime())) {
+-                                const match = dateStr.match(/(\d{2})[-/](\d{2})[-/](\d{4})\s+(\d{1,2}):(\d{2})/);
+-                                if (match) {
+-                                    parseDate = new Date(`${match[3]}-${match[2]}-${match[1]}T${match[4].padStart(2, '0')}:${match[5]}:00`);
++                    // PapaParse procesa el texto puro manejando delimitadores y comillas internas correctamente
++                    Papa.parse(text, {
++                        header: false, // No hay encabezado en la primera fila de datos
++                        skipEmptyLines: true,
++                        complete: (results) => {
++                            const activitiesToInsert: any[] = [];
++
++                            // Mapeo dinámico y difuso (fuzzy) de cabeceras para múltiples idiomas y formatos de exportación
++                            const headerRow = results.data[0] as string[];
++                            const hLower = headerRow.map(h => h ? h.toString().toLowerCase() : '');
++                            const findFuzzy = (keywords: string[]) => hLower.findIndex(h => keywords.some(k => h.includes(k)));
++
++                            const idxMap: { [key: string]: number | undefined } = {
++                                title: findFuzzy(['título', 'title']),
++                                date: findFuzzy(['fecha', 'date', 'tiempo', 'time']),
++                                dist: findFuzzy(['distancia', 'distance']),
++                                cal: findFuzzy(['calor', 'calorie']),
++                                duration: findFuzzy(['tiempo', 'time', 'duración', 'duration']),
++                                t_mov: findFuzzy(['tiempo en movimiento', 'moving time', 'tiempo mov']),
++                                t_transcur: findFuzzy(['tiempo transcurrido', 'elapsed time']),
++                                lap_best: findFuzzy(['mejor vuelta', 'best lap']),
++                                hr_mean: findFuzzy(['fc media', 'avg hr', 'mean hr', 'frecuencia card', 'frecuencia cardiaca media']),
++                                hr_max: findFuzzy(['fc m', 'fc max', 'max hr', 'frecuencia cardiaca max']),
++                                te_aer: findFuzzy(['te aer', 'aerobic te']),
++                                vel_mean: findFuzzy(['velocidad media', 'avg speed', 'vel media']),
++                                vel_max: findFuzzy(['velocidad m', 'max speed', 'vel max']),
++                                asc_tot: findFuzzy(['ascenso', 'elev gain', 'total ascent']),
++                                desc_tot: findFuzzy(['descenso', 'elev loss', 'total descent']),
++                                alt_min: findFuzzy(['altura min', 'altura mín', 'min elev']),
++                                alt_max: findFuzzy(['altura max', 'altura máx', 'max elev']),
++                                cad_mean: findFuzzy(['cadencia media', 'avg cadence', 'cad media']),
++                                cad_max: findFuzzy(['cadencia m', 'max cadence', 'cad max']),
++                                np: findFuzzy(['np', 'potencia normalizada', 'normalized power']),
++                                tss: findFuzzy(['tss', 'training stress score']),
++                                p20: findFuzzy(['20 min', '20min', 'potencia maxima 20']),
++                                p_mean: findFuzzy(['potencia media', 'avg power']),
++                                p_max: findFuzzy(['potencia m', 'max power']),
++                                strokes: findFuzzy(['pedaladas', 'strokes']),
++                                temp_min: findFuzzy(['temp. min', 'temp. mín', 'min temp', 'temperatura min']),
++                                descompresion: findFuzzy(['descompresi']),
++                                laps: findFuzzy(['vueltas', 'laps']),
++                                temp_max: findFuzzy(['temp. max', 'temp. máx', 'max temp', 'temperatura max']),
++                                resp_mean: findFuzzy(['resp. media', 'avg resp', 'respiracion media']),
++                                resp_min: findFuzzy(['resp. min', 'resp. mín', 'min resp', 'respiracion min']),
++                                resp_max: findFuzzy(['resp. max', 'resp. máx', 'max resp', 'respiracion max']),
++                            };
++
++                            // Limpiar índices que devuelven -1 (no encontrados)
++                            Object.keys(idxMap).forEach(k => { if (idxMap[k] === -1) idxMap[k] = undefined; });
++
++                            // Iterar por todas las filas usando el parser oficial
++                            for (let i = 1; i < results.data.length; i++) {
++                                const dataTokens = results.data[i] as string[];
++
++                                // Ignorar filas totalmente vacías o que comiencen con las etiquetas ignoradas de archivo Garmin
++                                if (!dataTokens || dataTokens.length < 10) continue;
++                                if (dataTokens[0] && typeof dataTokens[0] === 'string' && dataTokens[0].startsWith('Tipo de actividad')) continue;
++
++                                let fecha = null;
++                                if (idxMap.date !== undefined && dataTokens[idxMap.date]) {
++                                    let dateStr = dataTokens[idxMap.date].toString().replace(/"/g, '').trim();
++
++                                    // Fix DD/MM/YYYY into MM/DD/YYYY for native JS parsing
++                                    const isDDMMYYYY = /^(\d{2})[-/](\d{2})[-/](\d{4})/.test(dateStr);
++                                    if (isDDMMYYYY) {
++                                        dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$2/$1/$3');
++                                    }
++
++                                    // Try to parse the date
++                                    let parseDate = new Date(dateStr);
++
++                                    // Si sigue fallando, intentar un parseo agresivo extrayendo números
++                                    if (isNaN(parseDate.getTime())) {
++                                        const match = dateStr.match(/(\d{2})[-/](\d{2})[-/](\d{4})\s+(\d{1,2}):(\d{2})/);
++                                        if (match) {
++                                            parseDate = new Date(`${match[3]}-${match[2]}-${match[1]}T${match[4].padStart(2, '0')}:${match[5]}:00`);
++                                        }
++                                    }
++
++                                    if (!isNaN(parseDate.getTime())) {
++                                        fecha = parseDate.toISOString();
++                                    }
+                                 }
+-                            }
+-
+-                            if (!isNaN(parseDate.getTime())) {
+-                                fecha = parseDate.toISOString();
+-                            }
+-                        }
+ 
+-                        let duration_minutes = null;
+-                        const rawDuration = dataTokens[idxMap.duration] ? dataTokens[idxMap.duration].replace(/"/g, '').trim() : '';
+-
+-                        if (rawDuration && rawDuration !== '--') {
+-                            const timeParts = rawDuration.split(':').map(Number);
+-                            if (timeParts.length >= 3) {
+-                                // hh:mm:ss o hh:mm:ss.0
+-                                duration_minutes = Math.round(timeParts[0] * 60 + timeParts[1] + (timeParts[2] || 0) / 60);
+-                            } else if (timeParts.length === 2) {
+-                                // mm:ss
+-                                duration_minutes = Math.round(timeParts[0] + timeParts[1] / 60);
+-                            }
+-                        }
++                                let duration_minutes = null;
++                                const rawDuration = (idxMap.duration !== undefined && dataTokens[idxMap.duration]) ? dataTokens[idxMap.duration].toString().replace(/"/g, '').trim() : '';
++
++                                if (rawDuration && rawDuration !== '--') {
++                                    const timeParts = rawDuration.split(':').map(Number);
++                                    if (timeParts.length >= 3) {
++                                        // hh:mm:ss o hh:mm:ss.0
++                                        duration_minutes = Math.round(timeParts[0] * 60 + timeParts[1] + (timeParts[2] || 0) / 60);
++                                    } else if (timeParts.length === 2) {
++                                        // mm:ss
++                                        duration_minutes = Math.round(timeParts[0] + timeParts[1] / 60);
++                                    }
++                                }
+ 
+-                        const rawTiempo = dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--' ? dataTokens[idxMap.duration].replace(/"/g, '').trim() : null;
+-
+-                        const act = {
+-                            activity_date: fecha,
+-                            distance_km: tNum(dataTokens[idxMap.dist], 'decimal'),
+-                            calorias: tNum(dataTokens[idxMap.cal], 'integer'),
+-                            duration_minutes: duration_minutes,
+-
+-                            tiempo: rawTiempo,
+-                            tiempo_movimiento: dataTokens[idxMap.t_mov] && dataTokens[idxMap.t_mov] !== '--' ? dataTokens[idxMap.t_mov].replace(/"/g, '').trim() : null,
+-                            tiempo_transcurrido: dataTokens[idxMap.t_transcur] && dataTokens[idxMap.t_transcur] !== '--' ? dataTokens[idxMap.t_transcur].replace(/"/g, '').trim() : null,
+-                            mejor_vuelta: dataTokens[idxMap.lap_best] && dataTokens[idxMap.lap_best] !== '--' ? dataTokens[idxMap.lap_best].replace(/"/g, '').trim() : null,
+-
+-                            fc_media: tNum(dataTokens[idxMap.hr_mean], 'integer'),
+-                            fc_maxima: tNum(dataTokens[idxMap.hr_max], 'integer'),
+-                            te_aerobico: tNum(dataTokens[idxMap.te_aer], 'decimal'),
+-                            velocidad_media: tNum(dataTokens[idxMap.vel_mean], 'decimal'),
+-                            velocidad_maxima: tNum(dataTokens[idxMap.vel_max], 'decimal'),
+-                            ascenso_total: tNum(dataTokens[idxMap.asc_tot], 'integer'),
+-                            descenso_total: tNum(dataTokens[idxMap.desc_tot], 'integer'),
+-                            altura_min: tNum(dataTokens[idxMap.alt_min], 'integer'),
+-                            altura_max: tNum(dataTokens[idxMap.alt_max], 'integer'),
+-
+-                            cadencia_media: tNum(dataTokens[idxMap.cad_mean], 'integer'),
+-                            cadencia_maxima: tNum(dataTokens[idxMap.cad_max], 'integer'),
+-
+-                            normalized_power: tNum(dataTokens[idxMap.np], 'integer'),
+-                            training_stress_score: tNum(dataTokens[idxMap.tss], 'integer'),
+-                            potencia_20min: tNum(dataTokens[idxMap.p20], 'integer'),
+-                            potencia_media: tNum(dataTokens[idxMap.p_mean], 'integer'),
+-                            potencia_maxima: tNum(dataTokens[idxMap.p_max], 'integer'),
+-                            pedaladas_totales: tNum(dataTokens[idxMap.strokes], 'integer'),
+-
+-                            temperatura_min: tNum(dataTokens[idxMap.temp_min], 'decimal'),
+-                            descompresion: dataTokens[idxMap.descompresion] && dataTokens[idxMap.descompresion] !== '--' ? dataTokens[idxMap.descompresion] : null,
+-                            numero_vueltas: tNum(dataTokens[idxMap.laps], 'integer'),
+-                            temperatura_max: tNum(dataTokens[idxMap.temp_max], 'decimal'),
+-                            resp_media: tNum(dataTokens[idxMap.resp_mean], 'integer'),
+-                            resp_min: tNum(dataTokens[idxMap.resp_min], 'integer'),
+-                            resp_max: tNum(dataTokens[idxMap.resp_max], 'integer'),
+-                        };
+-
+-                        Object.keys(act).forEach(key => {
+-                            if ((act as any)[key] === null) {
+-                                delete (act as any)[key];
++                                const rawTiempo = (idxMap.duration !== undefined && dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--') ? dataTokens[idxMap.duration].toString().replace(/"/g, '').trim() : null;
++
++                                const act = {
++                                    titulo: (idxMap.title !== undefined && dataTokens[idxMap.title]) ? dataTokens[idxMap.title].toString().replace(/"/g, '').trim() : null,
++                                    activity_date: fecha,
++                                    distance_km: tNum(idxMap.dist !== undefined ? dataTokens[idxMap.dist]?.toString() : undefined, 'decimal'),
++                                    calorias: tNum(idxMap.cal !== undefined ? dataTokens[idxMap.cal]?.toString() : undefined, 'integer'),
++                                    duration_minutes: duration_minutes,
++
++                                    tiempo: rawTiempo,
++                                    tiempo_movimiento: (idxMap.t_mov !== undefined && dataTokens[idxMap.t_mov] && dataTokens[idxMap.t_mov] !== '--') ? dataTokens[idxMap.t_mov].toString().replace(/"/g, '').trim() : null,
++                                    tiempo_transcurrido: (idxMap.t_transcur !== undefined && dataTokens[idxMap.t_transcur] && dataTokens[idxMap.t_transcur] !== '--') ? dataTokens[idxMap.t_transcur].toString().replace(/"/g, '').trim() : null,
++                                    mejor_vuelta: (idxMap.lap_best !== undefined && dataTokens[idxMap.lap_best] && dataTokens[idxMap.lap_best] !== '--') ? dataTokens[idxMap.lap_best].toString().replace(/"/g, '').trim() : null,
++
++                                    fc_media: tNum(idxMap.hr_mean !== undefined ? dataTokens[idxMap.hr_mean]?.toString() : undefined, 'integer'),
++                                    fc_maxima: tNum(idxMap.hr_max !== undefined ? dataTokens[idxMap.hr_max]?.toString() : undefined, 'integer'),
++                                    te_aerobico: tNum(idxMap.te_aer !== undefined ? dataTokens[idxMap.te_aer]?.toString() : undefined, 'decimal'),
++                                    velocidad_media: tNum(idxMap.vel_mean !== undefined ? dataTokens[idxMap.vel_mean]?.toString() : undefined, 'decimal'),
++                                    velocidad_maxima: tNum(idxMap.vel_max !== undefined ? dataTokens[idxMap.vel_max]?.toString() : undefined, 'decimal'),
++                                    ascenso_total: tNum(idxMap.asc_tot !== undefined ? dataTokens[idxMap.asc_tot]?.toString() : undefined, 'integer'),
++                                    descenso_total: tNum(idxMap.desc_tot !== undefined ? dataTokens[idxMap.desc_tot]?.toString() : undefined, 'integer'),
++                                    altura_min: tNum(idxMap.alt_min !== undefined ? dataTokens[idxMap.alt_min]?.toString() : undefined, 'integer'),
++                                    altura_max: tNum(idxMap.alt_max !== undefined ? dataTokens[idxMap.alt_max]?.toString() : undefined, 'integer'),
++
++                                    cadencia_media: tNum(idxMap.cad_mean !== undefined ? dataTokens[idxMap.cad_mean]?.toString() : undefined, 'integer'),
++                                    cadencia_maxima: tNum(idxMap.cad_max !== undefined ? dataTokens[idxMap.cad_max]?.toString() : undefined, 'integer'),
++
++                                    normalized_power: tNum(idxMap.np !== undefined ? dataTokens[idxMap.np]?.toString() : undefined, 'integer'),
++                                    training_stress_score: tNum(idxMap.tss !== undefined ? dataTokens[idxMap.tss]?.toString() : undefined, 'decimal'),
++                                    potencia_20min: tNum(idxMap.p20 !== undefined ? dataTokens[idxMap.p20]?.toString() : undefined, 'integer'),
++                                    potencia_media: tNum(idxMap.p_mean !== undefined ? dataTokens[idxMap.p_mean]?.toString() : undefined, 'integer'),
++                                    potencia_maxima: tNum(idxMap.p_max !== undefined ? dataTokens[idxMap.p_max]?.toString() : undefined, 'integer'),
++                                    pedaladas_totales: tNum(idxMap.strokes !== undefined ? dataTokens[idxMap.strokes]?.toString() : undefined, 'integer'),
++
++                                    temperatura_min: tNum(idxMap.temp_min !== undefined ? dataTokens[idxMap.temp_min]?.toString() : undefined, 'decimal'),
++                                    descompresion: (idxMap.descompresion !== undefined && dataTokens[idxMap.descompresion] && dataTokens[idxMap.descompresion] !== '--') ? dataTokens[idxMap.descompresion].toString() : null,
++                                    numero_vueltas: tNum(idxMap.laps !== undefined ? dataTokens[idxMap.laps]?.toString() : undefined, 'integer'),
++                                    temperatura_max: tNum(idxMap.temp_max !== undefined ? dataTokens[idxMap.temp_max]?.toString() : undefined, 'decimal'),
++                                    resp_media: tNum(idxMap.resp_mean !== undefined ? dataTokens[idxMap.resp_mean]?.toString() : undefined, 'integer'),
++                                    resp_min: tNum(idxMap.resp_min !== undefined ? dataTokens[idxMap.resp_min]?.toString() : undefined, 'integer'),
++                                    resp_max: tNum(idxMap.resp_max !== undefined ? dataTokens[idxMap.resp_max]?.toString() : undefined, 'integer'),
++                                };
++
++                                Object.keys(act).forEach(key => {
++                                    if ((act as any)[key] === null) {
++                                        delete (act as any)[key];
++                                    }
++                                });
++
++                                if (act.distance_km !== undefined) {
++                                    activitiesToInsert.push(act);
++                                }
+                             }
+-                        });
+-
+ 
+-                        if (act.distance_km !== undefined) {
+-                            activitiesToInsert.push(act);
++                            resolve(activitiesToInsert);
+                         }
+-                    }
+-
+-                    resolve(activitiesToInsert);
++                    });
+                 } catch (err) {
+                     console.error("Error parseando CSV:", err);
+                     resolve([]);
+
+commit 740c34e67334ef9995f99cf53ab7bb3578b8c442
+Author: Rodrigo Cuevas <grottes.rcuevas@gmail.com>
+Date:   Thu Mar 5 18:56:36 2026 -0300
+
+    fix: eliminate all hardcoded column indices to prevent data shifting on garmin csvs with extra columns
+
+diff --git a/src/components/Dashboard.tsx b/src/components/Dashboard.tsx
+index 37cdb95..46ddc46 100644
+--- a/src/components/Dashboard.tsx
++++ b/src/components/Dashboard.tsx
+@@ -73,9 +73,9 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                         date: findIdx(['fecha', 'date', 'tiempo', 'time'], 1),
+                         duration: findIdx(['tiempo', 'time', 'duración', 'duration'], 6),
+                         dist: findIdx(['distancia', 'distance'], 4),
+-                        cal: findIdx(['calor', 'calorie'], 5), // calor matches CalorÃ­as
+-                        hr_mean: findIdx(['fc media', 'avg hr', 'mean hr', 'frecuencia card'], 12), // frecuencia card matches Frecuencia cardÃ­aca
+-                        hr_max: findIdx(['fc max', 'max hr'], 13), // fails accent -> fallback 13
++                        cal: findIdx(['calor', 'calorie'], 5),
++                        hr_mean: findIdx(['fc media', 'avg hr', 'mean hr', 'frecuencia card'], 12),
++                        hr_max: findIdx(['fc m', 'fc max', 'max hr'], 13),
+                         cad_mean: findIdx(['cadencia media', 'avg cadence'], 14),
+                         cad_max: findIdx(['cadencia m', 'max cadence'], 15),
+                         np: findIdx(['np', 'potencia normalizada', 'normalized power'], 16),
+@@ -84,13 +84,23 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                         p_mean: findIdx(['potencia media', 'avg power'], 19),
+                         p_max: findIdx(['potencia m', 'max power'], 20),
+                         strokes: findIdx(['pedaladas', 'strokes'], 21),
+-                        temp_min: findIdx(['temp. min', 'min temp'], 22),
++                        temp_min: findIdx(['temp. min', 'temp. mín', 'min temp'], 22),
+                         descompresion: findIdx(['descompresi'], 23),
+                         laps: findIdx(['vueltas', 'laps'], 25),
+-                        temp_max: findIdx(['temp. max', 'max temp'], 26),
++                        temp_max: findIdx(['temp. max', 'temp. máx', 'max temp'], 26),
+                         resp_mean: findIdx(['resp. media', 'avg resp'], 27),
+-                        resp_min: findIdx(['resp. m', 'min resp'], 28),
+-                        resp_max: findIdx(['resp. m', 'max resp'], 29),
++                        resp_min: findIdx(['resp. min', 'resp. mín', 'min resp'], 28),
++                        resp_max: findIdx(['resp. max', 'resp. máx', 'max resp'], 29),
++                        t_mov: findIdx(['tiempo en movimiento', 'moving time', 'tiempo mov'], 30),
++                        t_transcur: findIdx(['tiempo transcurrido', 'elapsed time'], 31),
++                        lap_best: findIdx(['mejor vuelta', 'best lap'], 24),
++                        te_aer: findIdx(['te aer', 'aerobic te'], 9),
++                        vel_mean: findIdx(['velocidad media', 'avg speed'], 10),
++                        vel_max: findIdx(['velocidad m', 'max speed'], 11),
++                        asc_tot: findIdx(['ascenso', 'elev gain', 'total ascent'], 12),
++                        desc_tot: findIdx(['descenso', 'elev loss', 'total descent'], 13),
++                        alt_min: findIdx(['altura min', 'altura mín', 'min elev'], 32),
++                        alt_max: findIdx(['altura max', 'altura máx', 'max elev'], 33),
+                     };
+ 
+                     const tNum = (val: string | undefined, metricType: 'auto' | 'decimal' | 'integer' = 'auto') => {
+@@ -191,19 +201,19 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                             duration_minutes: duration_minutes,
+ 
+                             tiempo: rawTiempo,
+-                            tiempo_movimiento: dataTokens[30] && dataTokens[30] !== '--' ? dataTokens[30].replace(/"/g, '').trim() : null,
+-                            tiempo_transcurrido: dataTokens[31] && dataTokens[31] !== '--' ? dataTokens[31].replace(/"/g, '').trim() : null,
+-                            mejor_vuelta: dataTokens[24] && dataTokens[24] !== '--' ? dataTokens[24] : null,
++                            tiempo_movimiento: dataTokens[idxMap.t_mov] && dataTokens[idxMap.t_mov] !== '--' ? dataTokens[idxMap.t_mov].replace(/"/g, '').trim() : null,
++                            tiempo_transcurrido: dataTokens[idxMap.t_transcur] && dataTokens[idxMap.t_transcur] !== '--' ? dataTokens[idxMap.t_transcur].replace(/"/g, '').trim() : null,
++                            mejor_vuelta: dataTokens[idxMap.lap_best] && dataTokens[idxMap.lap_best] !== '--' ? dataTokens[idxMap.lap_best].replace(/"/g, '').trim() : null,
+ 
+                             fc_media: tNum(dataTokens[idxMap.hr_mean], 'integer'),
+                             fc_maxima: tNum(dataTokens[idxMap.hr_max], 'integer'),
+-                            te_aerobico: tNum(dataTokens[9]),
+-                            velocidad_media: tNum(dataTokens[10]),
+-                            velocidad_maxima: tNum(dataTokens[11]),
+-                            ascenso_total: tNum(dataTokens[12]),
+-                            descenso_total: tNum(dataTokens[13]),
+-                            altura_min: tNum(dataTokens[32]),
+-                            altura_max: tNum(dataTokens[33]),
++                            te_aerobico: tNum(dataTokens[idxMap.te_aer], 'decimal'),
++                            velocidad_media: tNum(dataTokens[idxMap.vel_mean], 'decimal'),
++                            velocidad_maxima: tNum(dataTokens[idxMap.vel_max], 'decimal'),
++                            ascenso_total: tNum(dataTokens[idxMap.asc_tot], 'integer'),
++                            descenso_total: tNum(dataTokens[idxMap.desc_tot], 'integer'),
++                            altura_min: tNum(dataTokens[idxMap.alt_min], 'integer'),
++                            altura_max: tNum(dataTokens[idxMap.alt_max], 'integer'),
+ 
+                             cadencia_media: tNum(dataTokens[idxMap.cad_mean], 'integer'),
+                             cadencia_maxima: tNum(dataTokens[idxMap.cad_max], 'integer'),
+
+commit f347e11e84528607043667e3dd07ef7ff430a0ca
+Author: Rodrigo Cuevas <grottes.rcuevas@gmail.com>
+Date:   Thu Mar 5 18:49:50 2026 -0300
+
+    fix: dynamic detection for semicolon and tab delimiters in garmin csvs
+
+diff --git a/src/components/Dashboard.tsx b/src/components/Dashboard.tsx
+index 7aa7d3f..37cdb95 100644
+--- a/src/components/Dashboard.tsx
++++ b/src/components/Dashboard.tsx
+@@ -46,7 +46,23 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+ 
+                     // --- NUEVO MAPEO DINÁMICO DE CABECERAS ---
+                     const rawHeaders = lines[0].toLowerCase();
+-                    const headers = rawHeaders.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.trim().replace(/^"|"$/g, ''));
++
++                    // Detectar el delimitador (, ; o tabulador) basándonos en la primera línea.
++                    let delimiter = ',';
++                    const commaCount = (lines[0].match(/,/g) || []).length;
++                    const semicolonCount = (lines[0].match(/;/g) || []).length;
++                    const tabCount = (lines[0].match(/\t/g) || []).length;
++
++                    if (semicolonCount > commaCount && semicolonCount > tabCount) {
++                        delimiter = ';';
++                    } else if (tabCount > commaCount && tabCount > semicolonCount) {
++                        delimiter = '\t';
++                    }
++
++                    // Crear regex dinámica que respete el delimitador exceptuando cuando está dentro de comillas "".
++                    const splitRegex = new RegExp(`${delimiter}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
++
++                    const headers = rawHeaders.split(splitRegex).map(h => h.trim().replace(/^"|"$/g, ''));
+ 
+                     const findIdx = (keywords: string[], fallback: number) => {
+                         const idx = headers.findIndex(h => keywords.some(kw => h.includes(kw)));
+@@ -122,7 +138,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                         const line = lines[i].trim();
+                         if (!line || line.startsWith('"Tipo de actividad')) continue;
+ 
+-                        const dataTokens = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(t => t.trim().replace(/^"|"$/g, ''));
++                        const dataTokens = line.split(splitRegex).map(t => t.trim().replace(/^"|"$/g, ''));
+ 
+                         if (dataTokens.length < 10) continue;
+ 
+
+commit 3f59c70c45923ee53491b2187376b3b4e8124a61
+Author: Rodrigo Cuevas <grottes.rcuevas@gmail.com>
+Date:   Thu Mar 5 18:40:23 2026 -0300
+
+    fix: explicit garmin connect dd/mm/yyyy date regex and hh:mm duration parsing
+
+diff --git a/src/components/Dashboard.tsx b/src/components/Dashboard.tsx
+index 61cc1bc..7aa7d3f 100644
+--- a/src/components/Dashboard.tsx
++++ b/src/components/Dashboard.tsx
+@@ -130,14 +130,22 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                         if (dataTokens[idxMap.date]) {
+                             let dateStr = dataTokens[idxMap.date].replace(/"/g, '').trim();
+ 
++                            // Fix DD/MM/YYYY into MM/DD/YYYY for native JS parsing
+                             const isDDMMYYYY = /^(\d{2})[-/](\d{2})[-/](\d{4})/.test(dateStr);
+                             if (isDDMMYYYY) {
+-                                dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$3-$2-$1');
++                                dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$2/$1/$3');
+                             }
+ 
+-                            dateStr = dateStr.replace(' ', 'T');
++                            // Try to parse the date
++                            let parseDate = new Date(dateStr);
+ 
+-                            const parseDate = new Date(dateStr);
++                            // Si sigue fallando, intentar un parseo agresivo extrayendo números
++                            if (isNaN(parseDate.getTime())) {
++                                const match = dateStr.match(/(\d{2})[-/](\d{2})[-/](\d{4})\s+(\d{1,2}):(\d{2})/);
++                                if (match) {
++                                    parseDate = new Date(`${match[3]}-${match[2]}-${match[1]}T${match[4].padStart(2, '0')}:${match[5]}:00`);
++                                }
++                            }
+ 
+                             if (!isNaN(parseDate.getTime())) {
+                                 fecha = parseDate.toISOString();
+@@ -145,24 +153,30 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                         }
+ 
+                         let duration_minutes = null;
+-                        if (dataTokens[idxMap.duration]) {
+-                            const timeParts = dataTokens[idxMap.duration].split(':').map(Number);
+-                            if (timeParts.length === 3) {
+-                                duration_minutes = Math.round(timeParts[0] * 60 + timeParts[1] + timeParts[2] / 60);
++                        const rawDuration = dataTokens[idxMap.duration] ? dataTokens[idxMap.duration].replace(/"/g, '').trim() : '';
++
++                        if (rawDuration && rawDuration !== '--') {
++                            const timeParts = rawDuration.split(':').map(Number);
++                            if (timeParts.length >= 3) {
++                                // hh:mm:ss o hh:mm:ss.0
++                                duration_minutes = Math.round(timeParts[0] * 60 + timeParts[1] + (timeParts[2] || 0) / 60);
+                             } else if (timeParts.length === 2) {
++                                // mm:ss
+                                 duration_minutes = Math.round(timeParts[0] + timeParts[1] / 60);
+                             }
+                         }
+ 
++                        const rawTiempo = dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--' ? dataTokens[idxMap.duration].replace(/"/g, '').trim() : null;
++
+                         const act = {
+                             activity_date: fecha,
+                             distance_km: tNum(dataTokens[idxMap.dist], 'decimal'),
+                             calorias: tNum(dataTokens[idxMap.cal], 'integer'),
+                             duration_minutes: duration_minutes,
+ 
+-                            tiempo: dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--' ? dataTokens[idxMap.duration] : null,
+-                            tiempo_movimiento: dataTokens[30] && dataTokens[30] !== '--' ? dataTokens[30] : null,
+-                            tiempo_transcurrido: dataTokens[31] && dataTokens[31] !== '--' ? dataTokens[31] : null,
++                            tiempo: rawTiempo,
++                            tiempo_movimiento: dataTokens[30] && dataTokens[30] !== '--' ? dataTokens[30].replace(/"/g, '').trim() : null,
++                            tiempo_transcurrido: dataTokens[31] && dataTokens[31] !== '--' ? dataTokens[31].replace(/"/g, '').trim() : null,
+                             mejor_vuelta: dataTokens[24] && dataTokens[24] !== '--' ? dataTokens[24] : null,
+ 
+                             fc_media: tNum(dataTokens[idxMap.hr_mean], 'integer'),
+
+commit 00491935ce803b4f3329e6bdbc5c2f41d2b43950
+Author: Rodrigo Cuevas <grottes.rcuevas@gmail.com>
+Date:   Thu Mar 5 18:30:25 2026 -0300
+
+    fix: robust garmin csv parsing for eu number formatting and utf-8 mojibake in headers
+
+diff --git a/src/components/Dashboard.tsx b/src/components/Dashboard.tsx
+index 1438448..61cc1bc 100644
+--- a/src/components/Dashboard.tsx
++++ b/src/components/Dashboard.tsx
+@@ -57,24 +57,24 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                         date: findIdx(['fecha', 'date', 'tiempo', 'time'], 1),
+                         duration: findIdx(['tiempo', 'time', 'duración', 'duration'], 6),
+                         dist: findIdx(['distancia', 'distance'], 4),
+-                        cal: findIdx(['calor', 'calorie'], 5),
+-                        hr_mean: findIdx(['fc media', 'avg hr', 'mean hr'], 12),
+-                        hr_max: findIdx(['fc máx', 'max hr'], 13),
++                        cal: findIdx(['calor', 'calorie'], 5), // calor matches CalorÃ­as
++                        hr_mean: findIdx(['fc media', 'avg hr', 'mean hr', 'frecuencia card'], 12), // frecuencia card matches Frecuencia cardÃ­aca
++                        hr_max: findIdx(['fc max', 'max hr'], 13), // fails accent -> fallback 13
+                         cad_mean: findIdx(['cadencia media', 'avg cadence'], 14),
+-                        cad_max: findIdx(['cadencia máxima', 'max cadence'], 15),
++                        cad_max: findIdx(['cadencia m', 'max cadence'], 15),
+                         np: findIdx(['np', 'potencia normalizada', 'normalized power'], 16),
+                         tss: findIdx(['tss', 'training stress score'], 17),
+                         p20: findIdx(['20 min', '20min'], 18),
+                         p_mean: findIdx(['potencia media', 'avg power'], 19),
+-                        p_max: findIdx(['potencia máxima', 'max power'], 20),
++                        p_max: findIdx(['potencia m', 'max power'], 20),
+                         strokes: findIdx(['pedaladas', 'strokes'], 21),
+-                        temp_min: findIdx(['temp. mín', 'min temp'], 22),
++                        temp_min: findIdx(['temp. min', 'min temp'], 22),
+                         descompresion: findIdx(['descompresi'], 23),
+                         laps: findIdx(['vueltas', 'laps'], 25),
+-                        temp_max: findIdx(['temp. máx', 'max temp'], 26),
++                        temp_max: findIdx(['temp. max', 'max temp'], 26),
+                         resp_mean: findIdx(['resp. media', 'avg resp'], 27),
+-                        resp_min: findIdx(['resp. mín', 'min resp'], 28),
+-                        resp_max: findIdx(['resp. máx', 'max resp'], 29),
++                        resp_min: findIdx(['resp. m', 'min resp'], 28),
++                        resp_max: findIdx(['resp. m', 'max resp'], 29),
+                     };
+ 
+                     const tNum = (val: string | undefined, metricType: 'auto' | 'decimal' | 'integer' = 'auto') => {
+@@ -83,18 +83,28 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                         let cleaned = val.replace(/^"|"$/g, '').trim();
+                         if (cleaned === '') return null;
+ 
+-                        if (cleaned.includes(',') && cleaned.includes('.')) {
+-                            if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
+-                                cleaned = cleaned.replace(/,/g, '');
++                        if (metricType === 'integer') {
++                            // "1.016" -> "1016" (Spain thousands), "1,244" -> "1244" (US thousands)
++                            cleaned = cleaned.replace(/[,.]/g, '');
++                        } else if (metricType === 'decimal') {
++                            if (cleaned.includes(',') && cleaned.includes('.')) {
++                                if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
++                                    cleaned = cleaned.replace(/,/g, '');
++                                } else {
++                                    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
++                                }
+                             } else {
+-                                cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+-                            }
+-                        } else if (cleaned.includes(',')) {
+-                            if (metricType === 'integer') {
+-                                cleaned = cleaned.replace(/,/g, '');
+-                            } else if (metricType === 'decimal') {
++                                // "36,36" -> "36.36" or "36.36" -> "36.36"
+                                 cleaned = cleaned.replace(',', '.');
+-                            } else {
++                            }
++                        } else {
++                            if (cleaned.includes(',') && cleaned.includes('.')) {
++                                if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
++                                    cleaned = cleaned.replace(/,/g, '');
++                                } else {
++                                    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
++                                }
++                            } else if (cleaned.includes(',')) {
+                                 if (/,\d{3}$/.test(cleaned) && cleaned.length >= 5) {
+                                     cleaned = cleaned.replace(/,/g, '');
+                                 } else {
+@@ -110,7 +120,7 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                     // Iterar por todas las líneas saltando la cabecera
+                     for (let i = 1; i < lines.length; i++) {
+                         const line = lines[i].trim();
+-                        if (!line) continue;
++                        if (!line || line.startsWith('"Tipo de actividad')) continue;
+ 
+                         const dataTokens = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(t => t.trim().replace(/^"|"$/g, ''));
+ 
+
+commit 0c7ef7e0f8e4d7ea0a9e3dff68816407d33ddad2
+Author: Rodrigo Cuevas <grottes.rcuevas@gmail.com>
+Date:   Thu Mar 5 18:03:36 2026 -0300
+
+    feat: implement dynamic garmin csv header parsing and strict number cleaning
+
+diff --git a/src/components/Dashboard.tsx b/src/components/Dashboard.tsx
+index d7d141c..1438448 100644
+--- a/src/components/Dashboard.tsx
++++ b/src/components/Dashboard.tsx
+@@ -44,31 +44,65 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+ 
+                     const activitiesToInsert = [];
+ 
+-                    const tNum = (val: string, _isInt = false) => {
++                    // --- NUEVO MAPEO DINÁMICO DE CABECERAS ---
++                    const rawHeaders = lines[0].toLowerCase();
++                    const headers = rawHeaders.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.trim().replace(/^"|"$/g, ''));
++
++                    const findIdx = (keywords: string[], fallback: number) => {
++                        const idx = headers.findIndex(h => keywords.some(kw => h.includes(kw)));
++                        return idx === -1 ? fallback : idx;
++                    };
++
++                    const idxMap: Record<string, number> = {
++                        date: findIdx(['fecha', 'date', 'tiempo', 'time'], 1),
++                        duration: findIdx(['tiempo', 'time', 'duración', 'duration'], 6),
++                        dist: findIdx(['distancia', 'distance'], 4),
++                        cal: findIdx(['calor', 'calorie'], 5),
++                        hr_mean: findIdx(['fc media', 'avg hr', 'mean hr'], 12),
++                        hr_max: findIdx(['fc máx', 'max hr'], 13),
++                        cad_mean: findIdx(['cadencia media', 'avg cadence'], 14),
++                        cad_max: findIdx(['cadencia máxima', 'max cadence'], 15),
++                        np: findIdx(['np', 'potencia normalizada', 'normalized power'], 16),
++                        tss: findIdx(['tss', 'training stress score'], 17),
++                        p20: findIdx(['20 min', '20min'], 18),
++                        p_mean: findIdx(['potencia media', 'avg power'], 19),
++                        p_max: findIdx(['potencia máxima', 'max power'], 20),
++                        strokes: findIdx(['pedaladas', 'strokes'], 21),
++                        temp_min: findIdx(['temp. mín', 'min temp'], 22),
++                        descompresion: findIdx(['descompresi'], 23),
++                        laps: findIdx(['vueltas', 'laps'], 25),
++                        temp_max: findIdx(['temp. máx', 'max temp'], 26),
++                        resp_mean: findIdx(['resp. media', 'avg resp'], 27),
++                        resp_min: findIdx(['resp. mín', 'min resp'], 28),
++                        resp_max: findIdx(['resp. máx', 'max resp'], 29),
++                    };
++
++                    const tNum = (val: string | undefined, metricType: 'auto' | 'decimal' | 'integer' = 'auto') => {
+                         if (!val || val === '--' || val === '') return null;
+ 
+-                        // Quitamos comillas si Garmin las envolvió (ej: `"145"`)
+                         let cleaned = val.replace(/^"|"$/g, '').trim();
+                         if (cleaned === '') return null;
+ 
+-                        // Regla maestra de limpieza numérica pro (Soporta formatos USA y EU)
+                         if (cleaned.includes(',') && cleaned.includes('.')) {
+                             if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
+-                                cleaned = cleaned.replace(/,/g, ''); // USA: 1,234.56 -> 1234.56
++                                cleaned = cleaned.replace(/,/g, '');
+                             } else {
+-                                cleaned = cleaned.replace(/\./g, '').replace(',', '.'); // EU: 1.234,56 -> 1234.56
++                                cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+                             }
+                         } else if (cleaned.includes(',')) {
+-                            // Tiene coma pero no punto. Garmin exporta miles como "1,244". 
+-                            // Si tiene 3 dígitos tras la coma, asumimos que es separador de miles.
+-                            if (/,\d{3}$/.test(cleaned) && cleaned.length >= 5) {
+-                                cleaned = cleaned.replace(/,/g, ''); // 1,244 -> 1244
++                            if (metricType === 'integer') {
++                                cleaned = cleaned.replace(/,/g, '');
++                            } else if (metricType === 'decimal') {
++                                cleaned = cleaned.replace(',', '.');
+                             } else {
+-                                cleaned = cleaned.replace(',', '.'); // 15,5 -> 15.5
++                                if (/,\d{3}$/.test(cleaned) && cleaned.length >= 5) {
++                                    cleaned = cleaned.replace(/,/g, '');
++                                } else {
++                                    cleaned = cleaned.replace(',', '.');
++                                }
+                             }
+                         }
+ 
+-                        // Parsear explícitamente a Número de Javascript antes de enviarlo a PostgreSQL
+                         const num = Number(cleaned);
+                         return isNaN(num) ? null : num;
+                     }
+@@ -78,39 +112,31 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                         const line = lines[i].trim();
+                         if (!line) continue;
+ 
+-                        // Separar por comas respetando comillas
+                         const dataTokens = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(t => t.trim().replace(/^"|"$/g, ''));
+ 
+-                        // Validar si la fila tiene la longitud esperada para este nuevo formato (61 columnas aprox)
+                         if (dataTokens.length < 10) continue;
+ 
+                         let fecha = null;
+-                        if (dataTokens[1]) {
+-                            // Garmin Chile suele devolver "DD-MM-YYYY HH:mm:ss" pero a veces "YYYY-MM-DD HH:mm:ss"
+-                            let dateStr = dataTokens[1].replace(/"/g, '').trim();
++                        if (dataTokens[idxMap.date]) {
++                            let dateStr = dataTokens[idxMap.date].replace(/"/g, '').trim();
+ 
+-                            // Si detecta DD-MM-YYYY o DD/MM/YYYY, lo invierte a YYYY-MM-DD para compatibilidad absoluta de JS
+                             const isDDMMYYYY = /^(\d{2})[-/](\d{2})[-/](\d{4})/.test(dateStr);
+                             if (isDDMMYYYY) {
+                                 dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$3-$2-$1');
+                             }
+ 
+-                            // Sustituir el espacio entre fecha y hora por una T para asegurar la sintaxis ISO en todos los navegadores
+                             dateStr = dateStr.replace(' ', 'T');
+ 
+                             const parseDate = new Date(dateStr);
+ 
+-                            // Si logró parsearlo adecuadamente
+                             if (!isNaN(parseDate.getTime())) {
+                                 fecha = parseDate.toISOString();
+                             }
+                         }
+ 
+-                        // Mapeo exhaustivo para las 61 columnas reales del archivo final de Garmin
+-                        // Calcular duration_minutes (int4) desde la string "1:45:20"
+                         let duration_minutes = null;
+-                        if (dataTokens[6]) {
+-                            const timeParts = dataTokens[6].split(':').map(Number);
++                        if (dataTokens[idxMap.duration]) {
++                            const timeParts = dataTokens[idxMap.duration].split(':').map(Number);
+                             if (timeParts.length === 3) {
+                                 duration_minutes = Math.round(timeParts[0] * 60 + timeParts[1] + timeParts[2] / 60);
+                             } else if (timeParts.length === 2) {
+@@ -119,58 +145,45 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                         }
+ 
+                         const act = {
+-                            // Columnas de variables existentes en Supabase actual:
+                             activity_date: fecha,
+-                            distance_km: tNum(dataTokens[4]),
+-                            calorias: tNum(dataTokens[5]),
++                            distance_km: tNum(dataTokens[idxMap.dist], 'decimal'),
++                            calorias: tNum(dataTokens[idxMap.cal], 'integer'),
+                             duration_minutes: duration_minutes,
+ 
+-                            // Tiempos (Pasan como texto)
+-                            tiempo: dataTokens[6] && dataTokens[6] !== '--' ? dataTokens[6] : null,
++                            tiempo: dataTokens[idxMap.duration] && dataTokens[idxMap.duration] !== '--' ? dataTokens[idxMap.duration] : null,
+                             tiempo_movimiento: dataTokens[30] && dataTokens[30] !== '--' ? dataTokens[30] : null,
+                             tiempo_transcurrido: dataTokens[31] && dataTokens[31] !== '--' ? dataTokens[31] : null,
+                             mejor_vuelta: dataTokens[24] && dataTokens[24] !== '--' ? dataTokens[24] : null,
+ 
+-                            // FC
+-                            fc_media: tNum(dataTokens[7]),
+-                            fc_maxima: tNum(dataTokens[8]),
++                            fc_media: tNum(dataTokens[idxMap.hr_mean], 'integer'),
++                            fc_maxima: tNum(dataTokens[idxMap.hr_max], 'integer'),
+                             te_aerobico: tNum(dataTokens[9]),
+-
+-                            // Velocidad
+                             velocidad_media: tNum(dataTokens[10]),
+                             velocidad_maxima: tNum(dataTokens[11]),
+-
+-                            // Ascenso/Descenso
+                             ascenso_total: tNum(dataTokens[12]),
+                             descenso_total: tNum(dataTokens[13]),
+                             altura_min: tNum(dataTokens[32]),
+                             altura_max: tNum(dataTokens[33]),
+ 
+-                            // Cadencia
+-                            cadencia_media: tNum(dataTokens[14]),
+-                            cadencia_maxima: tNum(dataTokens[15]),
+-
+-                            // Potencia
+-                            normalized_power: tNum(dataTokens[16]),
+-                            training_stress_score: tNum(dataTokens[17]),
+-                            potencia_20min: tNum(dataTokens[18]),
+-                            potencia_media: tNum(dataTokens[19]),
+-                            potencia_maxima: tNum(dataTokens[20]),
+-                            pedaladas_totales: tNum(dataTokens[21]),
+-
+-                            // Clima Extras
+-                            temperatura_min: tNum(dataTokens[22]),
+-                            descompresion: dataTokens[23] && dataTokens[23] !== '--' ? dataTokens[23] : null,
+-                            numero_vueltas: tNum(dataTokens[25]),
+-                            temperatura_max: tNum(dataTokens[26]),
+-
+-                            // Respiración
+-                            resp_media: tNum(dataTokens[27]),
+-                            resp_min: tNum(dataTokens[28]),
+-                            resp_max: tNum(dataTokens[29]),
++                            cadencia_media: tNum(dataTokens[idxMap.cad_mean], 'integer'),
++                            cadencia_maxima: tNum(dataTokens[idxMap.cad_max], 'integer'),
++
++                            normalized_power: tNum(dataTokens[idxMap.np], 'integer'),
++                            training_stress_score: tNum(dataTokens[idxMap.tss], 'integer'),
++                            potencia_20min: tNum(dataTokens[idxMap.p20], 'integer'),
++                            potencia_media: tNum(dataTokens[idxMap.p_mean], 'integer'),
++                            potencia_maxima: tNum(dataTokens[idxMap.p_max], 'integer'),
++                            pedaladas_totales: tNum(dataTokens[idxMap.strokes], 'integer'),
++
++                            temperatura_min: tNum(dataTokens[idxMap.temp_min], 'decimal'),
++                            descompresion: dataTokens[idxMap.descompresion] && dataTokens[idxMap.descompresion] !== '--' ? dataTokens[idxMap.descompresion] : null,
++                            numero_vueltas: tNum(dataTokens[idxMap.laps], 'integer'),
++                            temperatura_max: tNum(dataTokens[idxMap.temp_max], 'decimal'),
++                            resp_media: tNum(dataTokens[idxMap.resp_mean], 'integer'),
++                            resp_min: tNum(dataTokens[idxMap.resp_min], 'integer'),
++                            resp_max: tNum(dataTokens[idxMap.resp_max], 'integer'),
+                         };
+ 
+-                        // Purgar valores 'null' del objeto para enviar solo lo existente y útil
+                         Object.keys(act).forEach(key => {
+                             if ((act as any)[key] === null) {
+                                 delete (act as any)[key];
+@@ -178,7 +191,6 @@ export function Dashboard({ session, activities, onDataChanged }: { session: Ses
+                         });
+ 
+ 
+-                        // Insistir que solo pasa si calculó la distancia (usando la llave real de supabase)
+                         if (act.distance_km !== undefined) {
+                             activitiesToInsert.push(act);
+                         }
+
+commit 3c4df0d9086dbc99f46d5b32394976fac1162b3f
+Author: Rodrigo Cuevas <grottes.rcuevas@gmail.com>
+Date:   Wed Mar 4 04:03:51 2026 -0300
+
+    feat: update landing page features and make event date universal
+
+diff --git a/src/components/Dashboard.tsx b/src/components/Dashboard.tsx
+index d1da4b5..d7d141c 100644
+--- a/src/components/Dashboard.tsx
++++ b/src/components/Dashboard.tsx
+@@ -2,20 +2,21 @@ import React, { useState, useEffect } from 'react';
+ import { supabase } from '../lib/supabase';
+ import { Session } from '@supabase/supabase-js';
+ 
+-export function Dashboard({ session }: { session: Session }) {
++export function Dashboard({ session, activities, onDataChanged }: { session: Session, activities: any[], onDataChanged: () => Promise<void> }) {
+     const [file, setFile] = useState<File | null>(null);
+     const [uploading, setUploading] = useState(false);
+     const [message, setMessage] = useState('');
+-    const [activities, setActivities] = useState<any[]>([]);
+-
+     const fetchActivities = async () => {
+         const { data, error } = await supabase
+             .from('activities')
+             .select('*')
++            .eq('user_id', session.user.id)
+             .order('activity_date', { ascending: false });
+ 
+         if (!error && data) {
+-            setActivities(data);
++            // Note: Dashboard doesn't set global activities anymore, 
++            // but we kept this here in case we need local fetching. 
++            // In a full refactor, this might be removed entirely.
+         }
+     };
+ 
+@@ -233,10 +234,11 @@ export function Dashboard({ session }: { session: Session }) {
+             }
+ 
+             setMessage(`✅ ¡Exito! Sincronización completa finalizada.`);
+-            setFile(null);
+-            fetchActivities();
++            // 3. Avisar al Componente Principal que los datos cambiaron
++            await onDataChanged();
++
+         } catch (error: any) {
+-            setMessage(`❌ Error al subir: ${error.message || 'Error desconocido'}`);
++            setMessage(`❌ Error al subir: ${error.message || 'Error desconocido'} `);
+         } finally {
+             setUploading(false);
+         }
+@@ -321,12 +323,12 @@ export function Dashboard({ session }: { session: Session }) {
+                         ) : (
+                             <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar min-h-[400px]">
+                                 {activities.map((act) => (
+-                                    <div key={act.id} className="p-5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
+-                                        <div className="flex-1 min-w-0">
++                                    <div key={act.id} className="p-5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 transition-all flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5">
++                                        <div className="flex-1 min-w-0 w-full xl:w-auto">
+                                             <p className="font-semibold text-garmin-blue text-lg truncate" title={act.file_name || act.titulo || 'Entrenamiento Garmin'}>
+                                                 {act.file_name || act.titulo || 'Entrenamiento Garmin'}
+                                             </p>
+-                                            <p className="text-sm text-zinc-400 mt-1">
++                                            <p className="text-sm text-zinc-400 mt-1 truncate">
+                                                 {act.activity_date
+                                                     ? new Date(act.activity_date).toLocaleString('es-CL', {
+                                                         timeZone: 'America/Santiago',
+@@ -336,7 +338,7 @@ export function Dashboard({ session }: { session: Session }) {
+                                                     : 'Fecha Desconocida'}
+                                             </p>
+                                         </div>
+-                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm w-full md:w-auto bg-zinc-900/50 p-3 rounded-lg border border-zinc-700/30">
++                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm w-full xl:w-fit bg-zinc-900/50 p-4 rounded-lg border border-zinc-700/30 shrink-0">
+                                             <div className="flex flex-col">
+                                                 <span className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Distancia</span>
+                                                 <span className="font-semibold text-zinc-200">{parseFloat(act.distance_km || 0).toFixed(1)} <span className="text-zinc-500 font-normal">km</span></span>
+
+commit 76b4dc57a674bb686717a019bbc05237222ee25a
+Author: Rodrigo Cuevas <grottes.rcuevas@gmail.com>
+Date:   Mon Mar 2 09:43:25 2026 -0300
+
+    Initial commit
+
+diff --git a/src/components/Dashboard.tsx b/src/components/Dashboard.tsx
+index a4a6a76..d1da4b5 100644
+--- a/src/components/Dashboard.tsx
++++ b/src/components/Dashboard.tsx
+@@ -12,7 +12,7 @@ export function Dashboard({ session }: { session: Session }) {
+         const { data, error } = await supabase
+             .from('activities')
+             .select('*')
+-            .order('created_at', { ascending: false });
++            .order('activity_date', { ascending: false });
+ 
+         if (!error && data) {
+             setActivities(data);
+@@ -43,8 +43,6 @@ export function Dashboard({ session }: { session: Session }) {
+ 
+                     const activitiesToInsert = [];
+ 
+-                    // Función auxiliar paso-crudo (Raw pass-through). 
+-                    // No convierte a Number en JS para evitar que JS modifique el decimal Garmin original.
+                     const tNum = (val: string, _isInt = false) => {
+                         if (!val || val === '--' || val === '') return null;
+ 
+@@ -52,15 +50,26 @@ export function Dashboard({ session }: { session: Session }) {
+                         let cleaned = val.replace(/^"|"$/g, '').trim();
+                         if (cleaned === '') return null;
+ 
+-                        // Si el usuario quiere que la coma española pase limpia a la BD, no hacemos floats
+-                        // Retornamos el string puro, postgres se encargará de hacer el CAST a su columna Number/Interval
+-                        return cleaned;
+-                    }
++                        // Regla maestra de limpieza numérica pro (Soporta formatos USA y EU)
++                        if (cleaned.includes(',') && cleaned.includes('.')) {
++                            if (cleaned.indexOf(',') < cleaned.indexOf('.')) {
++                                cleaned = cleaned.replace(/,/g, ''); // USA: 1,234.56 -> 1234.56
++                            } else {
++                                cleaned = cleaned.replace(/\./g, '').replace(',', '.'); // EU: 1.234,56 -> 1234.56
++                            }
++                        } else if (cleaned.includes(',')) {
++                            // Tiene coma pero no punto. Garmin exporta miles como "1,244". 
++                            // Si tiene 3 dígitos tras la coma, asumimos que es separador de miles.
++                            if (/,\d{3}$/.test(cleaned) && cleaned.length >= 5) {
++                                cleaned = cleaned.replace(/,/g, ''); // 1,244 -> 1244
++                            } else {
++                                cleaned = cleaned.replace(',', '.'); // 15,5 -> 15.5
++                            }
++                        }
+ 
+-                    const tInterval = (val: string) => {
+-                        if (!val || val === '--' || val === '') return null;
+-                        // Los tiempos como '00:55:04' son directamente compatibles con Postgres interval
+-                        return val;
++                        // Parsear explícitamente a Número de Javascript antes de enviarlo a PostgreSQL
++                        const num = Number(cleaned);
++                        return isNaN(num) ? null : num;
+                     }
+ 
+                     // Iterar por todas las líneas saltando la cabecera
+@@ -76,7 +85,21 @@ export function Dashboard({ session }: { session: Session }) {
+ 
+                         let fecha = null;
+                         if (dataTokens[1]) {
+-                            const parseDate = new Date(dataTokens[1]); // ej. "2026-02-20 11:35:11"
++                            // Garmin Chile suele devolver "DD-MM-YYYY HH:mm:ss" pero a veces "YYYY-MM-DD HH:mm:ss"
++                            let dateStr = dataTokens[1].replace(/"/g, '').trim();
++
++                            // Si detecta DD-MM-YYYY o DD/MM/YYYY, lo invierte a YYYY-MM-DD para compatibilidad absoluta de JS
++                            const isDDMMYYYY = /^(\d{2})[-/](\d{2})[-/](\d{4})/.test(dateStr);
++                            if (isDDMMYYYY) {
++                                dateStr = dateStr.replace(/^(\d{2})[-/](\d{2})[-/](\d{4})/, '$3-$2-$1');
++                            }
++
++                            // Sustituir el espacio entre fecha y hora por una T para asegurar la sintaxis ISO en todos los navegadores
++                            dateStr = dateStr.replace(' ', 'T');
++
++                            const parseDate = new Date(dateStr);
++
++                            // Si logró parsearlo adecuadamente
+                             if (!isNaN(parseDate.getTime())) {
+                                 fecha = parseDate.toISOString();
+                             }
+@@ -188,31 +211,20 @@ export function Dashboard({ session }: { session: Session }) {
+                 throw new Error("No se encontraron entrenamientos legibles en el CSV. Intenta resubir.");
+             }
+ 
+-            setMessage(`Respaldando ${file.name} en Supabase Storage...`);
+-            const fileExt = file.name.split('.').pop();
+-            const fileName = `${session.user.id}/${Math.random()}.${fileExt}`;
+-
+-            const { error: uploadError } = await supabase.storage
+-                .from('activities')
+-                .upload(fileName, file);
+-
+-            if (uploadError) throw uploadError;
+-
+-            setMessage(`Inyectando ${parsedActivities.length} entrenamientos limpios en tu Base de Datos...`);
++            // Usamos Upsert delegando el filtro de duplicados a PostgreSQL
++            // La base de datos ignorará silenciosamente si las 3 claves coinciden
++            setMessage(`Inyectando hasta ${parsedActivities.length} entrenamientos limpios en tu Base de Datos...`);
+ 
+-            // Adjuntamos el user_id para asegurar que queden a nombre del usuario activo
+             let insertPayload = parsedActivities.map(act => ({
+                 user_id: session.user.id,
+                 ...act
+             }));
+ 
+-            // Inserción masiva en Supabase sin Auto-Sanado para forzar que falle e imprima la causa
+-            console.log("PAYLOAD a Insertar:", insertPayload[0]);
+-
+             const { error: dbError } = await supabase
+                 .from('activities')
+                 .upsert(insertPayload, {
+-                    onConflict: 'user_id, activity_date, distance_km' // Clave combinada Nivel SaaS para Doble Turno
++                    onConflict: 'user_id, activity_date, distance_km',
++                    ignoreDuplicates: true // Clave vital: ignora duplicados en lugar de dar error o sobreescribir
+                 });
+ 
+             if (dbError) {
+@@ -220,7 +232,7 @@ export function Dashboard({ session }: { session: Session }) {
+                 throw new Error('Error guardando en la tabla: ' + dbError.message + " - Detalles en consola.");
+             }
+ 
+-            setMessage(`✅ ¡Exito! Se sincronizaron perfectamente ${parsedActivities.length} actividades.`);
++            setMessage(`✅ ¡Exito! Sincronización completa finalizada.`);
+             setFile(null);
+             fetchActivities();
+         } catch (error: any) {
+@@ -307,14 +319,22 @@ export function Dashboard({ session }: { session: Session }) {
+                                 <p className="text-zinc-500 text-sm mt-2 max-w-sm">Sube tu primer archivo de Garmin en el panel lateral para empezar a visualizar tus métricas.</p>
+                             </div>
+                         ) : (
+-                            <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar" style={{ maxHeight: "calc(100vh - 200px)" }}>
++                            <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar min-h-[400px]">
+                                 {activities.map((act) => (
+                                     <div key={act.id} className="p-5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
+                                         <div className="flex-1 min-w-0">
+                                             <p className="font-semibold text-garmin-blue text-lg truncate" title={act.file_name || act.titulo || 'Entrenamiento Garmin'}>
+                                                 {act.file_name || act.titulo || 'Entrenamiento Garmin'}
+                                             </p>
+-                                            <p className="text-sm text-zinc-400 mt-1">{act.activity_date ? new Date(act.activity_date).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' }) : 'Fecha Desconocida'}</p>
++                                            <p className="text-sm text-zinc-400 mt-1">
++                                                {act.activity_date
++                                                    ? new Date(act.activity_date).toLocaleString('es-CL', {
++                                                        timeZone: 'America/Santiago',
++                                                        dateStyle: 'long',
++                                                        timeStyle: 'short'
++                                                    })
++                                                    : 'Fecha Desconocida'}
++                                            </p>
+                                         </div>
+                                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm w-full md:w-auto bg-zinc-900/50 p-3 rounded-lg border border-zinc-700/30">
+                                             <div className="flex flex-col">

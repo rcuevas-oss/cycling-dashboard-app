@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bot, Sparkles, Send, Zap, X } from 'lucide-react';
 import { TrainingBlock } from '../lib/fitUtils';
-import { generateWeeklyPlan } from '../lib/gemini';
+import { runCoachPipeline } from '../lib/coach/pipeline';
+import { TRAINING_BLOCKS } from './TrainingPlanner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '../lib/supabase';
@@ -14,7 +15,6 @@ interface AICoachModalProps {
     session: Session;
     athleteProfile?: any;
     recentActivitiesData?: any[];
-    scheduleData?: Record<string, TrainingBlock[]>;
 }
 
 interface ChatMessage {
@@ -22,11 +22,10 @@ interface ChatMessage {
     role: 'user' | 'ai';
     content: string;
     plan?: Record<string, TrainingBlock[]>;
-    suggestedOptions?: string[];
     isGreeting?: boolean;
 }
 
-export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athleteProfile, recentActivitiesData, scheduleData }: AICoachModalProps) {
+export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athleteProfile, recentActivitiesData }: AICoachModalProps) {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
     const [inputMsg, setInputMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -110,13 +109,23 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athletePro
                 }
 
                 return {
-                    fecha: act.activity_date,
-                    distancia_km: act.distance_km,
-                    duracion_min: act.duration_minutes,
-                    TSS: act.training_stress_score,
-                    fc_media: act.fc_media,
-                    potencia_normalizada: act.normalized_power,
-                    desnivel_acumulado: act.ascenso_total
+                    id: act.id || Math.random().toString(),
+                    start_date: act.activity_date || new Date().toISOString(),
+                    type: act.type || 'Ride',
+                    distance: act.distance_km ? act.distance_km * 1000 : 0,
+                    moving_time: act.duration_minutes ? act.duration_minutes * 60 : 0,
+                    elapsed_time: act.duration_minutes ? act.duration_minutes * 60 : 0,
+                    total_elevation_gain: act.ascenso_total || 0,
+                    average_speed: 0,
+                    max_speed: 0,
+                    average_heartrate: act.fc_media,
+                    max_heartrate: act.fc_maxima,
+                    normalized_power: act.normalized_power,
+                    training_stress_score: act.training_stress_score,
+                    intensity_factor: undefined,
+                    average_watts: act.potencia_media,
+                    max_watts: act.potencia_maxima,
+                    average_cadence: act.cadencia_media
                 };
             });
 
@@ -132,15 +141,24 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athletePro
                 }
             };
 
-            const response = await generateWeeklyPlan(apiKey, newMsg, enrichedAthleteContext, recentActivities, scheduleData);
+            const response = await runCoachPipeline(apiKey, newMsg, enrichedAthleteContext, recentActivities);
+
+            let scheduledPlan: Record<string, TrainingBlock[]> | undefined = undefined;
+            if (response.generatedPlan && response.generatedPlan.length > 0) {
+                 scheduledPlan = {};
+                 response.generatedPlan.forEach(block => {
+                     if (!scheduledPlan![block.date]) scheduledPlan![block.date] = [];
+                     const template = TRAINING_BLOCKS.find(b => b.id === block.block_id);
+                     if (template) scheduledPlan![block.date].push({...template});
+                 });
+            }
 
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
-                content: response.textResponse,
-                plan: response.schedule || undefined,
-                suggestedOptions: response.suggestedOptions || [],
-                isGreeting: response.isGreeting
+                content: response.textMarkdown,
+                plan: scheduledPlan,
+                isGreeting: false
             }]);
         } catch (error: any) {
             setMessages(prev => [...prev, { id: Date.now().toString(), role: 'ai', content: `❌ Error de IA: ${error.message}` }]);
@@ -361,21 +379,6 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athletePro
                                                     Método para hacer un FTP
                                                 </button>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    {/* Chips de Opciones Sugeridas genéricas y cortas */}
-                                    {m.suggestedOptions && m.suggestedOptions.length > 0 && m.role === 'ai' && !m.isGreeting && (
-                                        <div className="mt-4 pt-4 border-t border-zinc-800/80 flex flex-col gap-2">
-                                            {m.suggestedOptions.map((opt, i) => (
-                                                <button
-                                                    key={i}
-                                                    onClick={() => handleSend(opt)}
-                                                    className="w-full text-left px-3 py-2 bg-zinc-800/40 hover:bg-indigo-600/20 border border-zinc-700/50 hover:border-indigo-500/30 text-xs text-zinc-300 rounded-lg transition-all"
-                                                >
-                                                    {opt}
-                                                </button>
-                                            ))}
                                         </div>
                                     )}
                                 </div>

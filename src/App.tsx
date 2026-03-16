@@ -209,7 +209,6 @@ export default function App() {
                                     session={session}
                                     athleteProfile={globalProfile}
                                     recentActivitiesData={globalActivities}
-                                    scheduleData={schedule}
                                     onApplyPlan={(plan) => setSchedule(plan)}
                                     onNavigate={(v) => setActiveTab(v as any)}
                                 />
@@ -255,7 +254,6 @@ export default function App() {
                         session={session}
                         athleteProfile={globalProfile}
                         recentActivitiesData={globalActivities}
-                        scheduleData={schedule}
                     />
                 </div>
             )}

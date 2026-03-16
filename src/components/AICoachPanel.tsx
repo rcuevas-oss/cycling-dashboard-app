@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bot, Send, Zap, Flag } from 'lucide-react';
 import { TrainingBlock } from '../lib/fitUtils';
-import { generateWeeklyPlan } from '../lib/gemini';
+import { runCoachPipeline } from '../lib/coach/pipeline';
+import { TRAINING_BLOCKS } from './TrainingPlanner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '../lib/supabase';
@@ -11,7 +12,6 @@ interface AICoachPanelProps {
     session: Session;
     athleteProfile?: any;
     recentActivitiesData?: any[];
-    scheduleData?: Record<string, TrainingBlock[]>;
     onApplyPlan?: (plan: Record<string, TrainingBlock[]>) => void;
     onNavigate?: (view: string) => void;
 }
@@ -21,11 +21,10 @@ interface ChatMessage {
     role: 'user' | 'ai';
     content: string;
     plan?: Record<string, TrainingBlock[]>;
-    suggestedOptions?: string[];
     isGreeting?: boolean;
 }
 
-export function AICoachPanel({ session, athleteProfile, recentActivitiesData, scheduleData, onApplyPlan, onNavigate }: AICoachPanelProps) {
+export function AICoachPanel({ session, athleteProfile, recentActivitiesData, onApplyPlan, onNavigate }: AICoachPanelProps) {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
     const [inputMsg, setInputMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -37,7 +36,7 @@ export function AICoachPanel({ session, athleteProfile, recentActivitiesData, sc
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, isLoading]);
 
-    const handleSend = async (forcedMessage?: string, isSilentUserMessage: boolean = false) => {
+    const handleSend = async (forcedMessage?: string, displayMessage?: string) => {
         const messageToSend = forcedMessage || inputMsg;
         if (!messageToSend.trim()) return;
         if (!apiKey) {
@@ -52,9 +51,7 @@ export function AICoachPanel({ session, athleteProfile, recentActivitiesData, sc
         const newMsg = messageToSend.trim();
         setInputMsg('');
 
-        if (!isSilentUserMessage) {
-            setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: newMsg }]);
-        }
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: displayMessage || newMsg }]);
 
         setIsLoading(true);
 
@@ -105,13 +102,23 @@ export function AICoachPanel({ session, athleteProfile, recentActivitiesData, sc
                 }
 
                 return {
-                    fecha: act.activity_date,
-                    distancia_km: act.distance_km,
-                    duracion_min: act.duration_minutes,
-                    TSS: act.training_stress_score,
-                    fc_media: act.fc_media,
-                    potencia_normalizada: act.normalized_power,
-                    desnivel_acumulado: act.ascenso_total
+                    id: act.id || Math.random().toString(),
+                    start_date: act.activity_date || new Date().toISOString(),
+                    type: act.type || 'Ride',
+                    distance: act.distance_km ? act.distance_km * 1000 : 0,
+                    moving_time: act.duration_minutes ? act.duration_minutes * 60 : 0,
+                    elapsed_time: act.duration_minutes ? act.duration_minutes * 60 : 0,
+                    total_elevation_gain: act.ascenso_total || 0,
+                    average_speed: 0,
+                    max_speed: 0,
+                    average_heartrate: act.fc_media,
+                    max_heartrate: act.fc_maxima,
+                    normalized_power: act.normalized_power,
+                    training_stress_score: act.training_stress_score,
+                    intensity_factor: undefined,
+                    average_watts: act.potencia_media,
+                    max_watts: act.potencia_maxima,
+                    average_cadence: act.cadencia_media
                 };
             });
 
@@ -126,18 +133,24 @@ export function AICoachPanel({ session, athleteProfile, recentActivitiesData, sc
                 }
             };
 
-            const response = await generateWeeklyPlan(apiKey, newMsg, enrichedAthleteContext, recentActivities, scheduleData);
+            const response = await runCoachPipeline(apiKey, newMsg, enrichedAthleteContext, recentActivities);
 
-            // Interceptar intención de IA de abrir el planificador o dashboard (Opcional, futuro)
-            // Si la IA dice "Abre el planificador", podríamos onNavigate('planner')
+            let scheduledPlan: Record<string, TrainingBlock[]> | undefined = undefined;
+            if (response.generatedPlan && response.generatedPlan.length > 0) {
+                 scheduledPlan = {};
+                 response.generatedPlan.forEach(block => {
+                     if (!scheduledPlan![block.date]) scheduledPlan![block.date] = [];
+                     const template = TRAINING_BLOCKS.find(b => b.id === block.block_id);
+                     if (template) scheduledPlan![block.date].push({...template});
+                 });
+            }
 
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
-                content: response.textResponse,
-                plan: response.schedule || undefined,
-                suggestedOptions: response.suggestedOptions || [],
-                isGreeting: response.isGreeting
+                content: response.textMarkdown,
+                plan: scheduledPlan,
+                isGreeting: false
             }]);
         } catch (error: any) {
             setMessages(prev => [...prev, { id: Date.now().toString(), role: 'ai', content: `❌ Error de IA: ${error.message}` }]);
@@ -146,8 +159,20 @@ export function AICoachPanel({ session, athleteProfile, recentActivitiesData, sc
         }
     };
 
-    const promptPlanObjetivo = "Arma mi plan de entrenamiento hacia mi objetivo. Ábreme el Planificador AI para verlo.";
-    const promptAnalisis = "Evalúa mi progreso para llegar a mi objetivo basado en mis métricas biométricas recientes.";
+    // Pro Prompts for Quick Analysis
+    const promptAuditoria = `Actúa como un científico de datos deportivos y analiza mi historial completo disponible (evaluando tus datos de los últimos 90 días).
+No me resumas la última semana, quiero que busques patrones a macro escala. Responde estrictamente basado en los números a estas áreas:
+1. Cruza mis entrenamientos de tipo [ENDURANCE] (rodajes largos) versus los de [TEMPO/SWEETSPOT]. ¿En cuál de las dos zonas aeróbicas mi relación de Watts Normalizados (NP) vs Frecuencia Cardíaca (HR) es más eficiente históricamente? (Calcula W/latido).
+2. Localiza mi sesión con el TSS más alto registrado en la bitácora. Dime la fecha, cuántos Watts Normalizados moví, y compáralo con mi FTP actual para explicarme qué significa ese esfuerzo.
+3. Evalúa el "agujero" o eslabón débil en mi curva de entrenamiento que debería solucionar en el próximo mes.`;
+
+    const promptEficiencia = `Analiza mi eficiencia aeróbica y mi factor de intensidad en mis últimos entrenamientos.
+Cruza mis Watts Normalizados (NP) con mi Frecuencia Cardíaca (HR) media. ¿Estoy mejorando mi eficiencia térmica y cardíaca para los mismos vatios?
+Por favor, apóyate en datos específicos y compara 2 o 3 sesiones recientes contra sesiones más antiguas si tienes datos.`;
+
+    const promptForma = `Analiza mi estado de forma físico para competir usando el modelo de Impulso de Entrenamiento (TRIMP/TSS).
+Compara mi CTL actual (estado de forma crónica a 42 días) versus mi ATL (fatiga aguda de los últimos 7 días calculada desde mi TSS 7d).
+Basado matemáticamente en esta relación (TSB), ¿estoy en fase de construcción, estoy en pico de forma (fresco), o estoy en riesgo de fatiga excesiva (overreaching)?`;
 
     // Cálculos Relativos
     const ftp = athleteProfile?.ftp_actual;
@@ -238,7 +263,7 @@ export function AICoachPanel({ session, athleteProfile, recentActivitiesData, sc
 
                         <div className="flex flex-col gap-3 w-full max-w-[280px]">
                             <button
-                                onClick={() => handleSend("Analiza mi estado de forma actual y dame un diagnóstico basado en la carga reciente.", true)}
+                                onClick={() => handleSend("Analiza mi estado de forma actual y dame un diagnóstico basado en la carga reciente.", "🚀 Generar Diagnóstico Inicial")}
                                 className="w-full py-3 px-4 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 hover:text-indigo-200 rounded-xl text-sm font-bold shadow-[0_0_15px_rgba(99,102,241,0.2)] hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] flex items-center justify-center gap-2 transition-all"
                             >
                                 <Zap className="w-4 h-4" />
@@ -284,16 +309,6 @@ export function AICoachPanel({ session, athleteProfile, recentActivitiesData, sc
                                         </button>
                                     </div>
                                 )}
-
-                                {m.suggestedOptions && m.suggestedOptions.length > 0 && m.role === 'ai' && (
-                                    <div className="mt-4 pt-4 border-t border-zinc-800/80 flex flex-col gap-2">
-                                        {m.suggestedOptions.map((opt, i) => (
-                                            <button key={i} onClick={() => handleSend(opt)} className="text-left px-3 py-2 bg-zinc-800/40 hover:bg-indigo-600/20 border border-zinc-700/50 hover:border-indigo-500/30 text-xs text-zinc-300 rounded-lg transition-all">
-                                                {opt}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
                         </div>
                     ))}
@@ -320,13 +335,18 @@ export function AICoachPanel({ session, athleteProfile, recentActivitiesData, sc
             </div>
 
             {/* Quick Prompts (Above Input box for fast action) */}
-            <div className="px-3 pt-2 pb-1 bg-[#111113] flex gap-2 overflow-x-auto custom-scrollbar">
-                <button onClick={() => { handleSend(promptPlanObjetivo); if (onNavigate) onNavigate('planner'); }} className="shrink-0 px-3 py-1.5 bg-zinc-800/50 hover:bg-indigo-500/20 text-indigo-300 text-[11px] font-semibold border border-zinc-700/50 hover:border-indigo-500/50 rounded-full transition-all">
-                    Planificar Objetivo
+            <div className="px-3 pt-2 pb-2 bg-[#111113] flex gap-1.5 overflow-x-auto custom-scrollbar items-center">
+                <button onClick={() => handleSend(promptAuditoria, "📊 Auditoría de Temporada")} className="shrink-0 px-2 py-0.5 bg-zinc-800/50 hover:bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold border border-zinc-700/50 hover:border-indigo-500/50 rounded-full transition-all whitespace-nowrap">
+                    📊 Auditoría de Temporada
                 </button>
-                <button onClick={() => handleSend(promptAnalisis)} className="shrink-0 px-3 py-1.5 bg-zinc-800/50 hover:bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold border border-zinc-700/50 hover:border-emerald-500/50 rounded-full transition-all">
-                    Evaluar Progreso
+                <button onClick={() => handleSend(promptEficiencia, "⚡️ Analizar Eficiencia")} className="shrink-0 px-2 py-0.5 bg-zinc-800/50 hover:bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold border border-zinc-700/50 hover:border-emerald-500/50 rounded-full transition-all whitespace-nowrap">
+                    ⚡️ Analizar Eficiencia
                 </button>
+                <button onClick={() => handleSend(promptForma, "🔥 Estado de Forma (TSB)")} className="shrink-0 px-2 py-0.5 bg-zinc-800/50 hover:bg-rose-500/20 text-rose-300 text-[10px] font-semibold border border-zinc-700/50 hover:border-rose-500/50 rounded-full transition-all whitespace-nowrap">
+                    🔥 Estado de Forma (TSB)
+                </button>
+                {/* Spacer invisible para forzar el padding derecho en scroll en móviles (bug de WebKit) */}
+                <div className="w-2 shrink-0" />
             </div>
 
             {/* Input */}
