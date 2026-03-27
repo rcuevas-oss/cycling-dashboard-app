@@ -1,0 +1,189 @@
+.panel-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  animation: slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--bg-surfaces);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surfaces);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.panel-header h2 {
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+.panel-body {
+  padding: 24px;
+}
+
+/* Base styles reusing what we had */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.summary-card {
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.card-icon {
+  background: var(--bg-surfaces-hover);
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+}
+
+.card-data {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.card-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.summary-cards.metrics-row {
+  margin-bottom: 32px;
+}
+
+.summary-cards.metrics-row .summary-card {
+  padding: 12px 16px;
+}
+
+.summary-cards.metrics-row .card-value {
+  font-size: 1.25rem;
+}
+
+.breakdown-section h3 {
+  font-size: 1.1rem;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+}
+
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-color);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.breakdown-item.detailed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breakdown-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.breakdown-day {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  background: rgba(59, 130, 246, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.breakdown-title {
+  font-weight: 500;
+}
+
+.breakdown-metrics {
+  display: flex;
+  gap: 8px;
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+
+.metric-badge {
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-weight: 600;
+}
+
+.metric-badge.tss {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
+.metric-badge.ctl {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.metric-badge.tsb {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-primary);
+}
+
+.chart-section {
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.chart-section h3 {
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+.chart-container {
+  width: 100%;
+}
+
+.mt-6 {
+  margin-top: 24px;
+}
+
+@keyframes slideLeft {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

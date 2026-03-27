@@ -63,4 +63,9 @@
   .animate-fade-in-down {
     animation: fade-in-down 0.8s ease-out;
   }
+
+  /* React Flow Global Overrides for Edge Visibility */
+  .react-flow__edge-path {
+    stroke-width: 3 !important;
+  }
 }

@@ -6,21 +6,32 @@ import { classifyArchetype } from "./utils";
  * to calculate relative performance changes (apples to apples).
  */
 export function findComparableSessions(
-  focusSession: ValidatedSession,
+  focusSessions: ValidatedSession[],
   baselineDays: ValidatedSession[]
 ): ComparableSessions {
-  const focusArchetype = classifyArchetype(focusSession);
+  // DESIGN-3 fix: For AM/PM double days, use the session with highest TSS as the
+  // representative, NOT the average. Averaging a recovery + VO2max session would give
+  // a misleading 'tempo' archetype and skew the baseline comparison.
+  const representativeSession = focusSessions.reduce((best, s) => {
+    const tss = (s.raw.tss || s.raw.training_stress_score || 0);
+    const bestTss = (best.raw.tss || best.raw.training_stress_score || 0);
+    return tss > bestTss ? s : best;
+  }, focusSessions[0]);
+
+  const focusArchetype = classifyArchetype(representativeSession);
+  const representativeNP = representativeSession.raw.np || representativeSession.raw.normalized_power || representativeSession.raw.potencia_media || 0;
+  const representativeHR = representativeSession.raw.average_heartrate || 0;
 
   // Find all historically valid sessions that match the same archetype
   const historicalMatches = baselineDays.filter(
     (s) => 
       (s.quality === "clean" || s.quality === "low_confidence") && 
       classifyArchetype(s) === focusArchetype &&
-      s.id !== focusSession.id // Don't compare with itself
+      !focusSessions.some(fs => fs.id === s.id)
   );
 
   let npDifferencePercent = 0;
-  let hrDifferencePercent = 0;
+  let hrDifferencePercent = 1; // Default neutral
   let efficiencyFactorChange = 0;
 
   if (historicalMatches.length > 0) {
@@ -44,8 +55,8 @@ export function findComparableSessions(
     const avgHistoricalHR = countHR > 0 ? sumHistoricalHR / countHR : 0;
     const avgHistoricalEF = countEF > 0 ? sumHistoricalEF / countEF : 0;
 
-    const currentNP = focusSession.raw.np || focusSession.raw.potencia_media || 0;
-    const currentHR = focusSession.raw.average_heartrate || 0;
+    const currentNP = representativeNP;
+    const currentHR = representativeHR;
     const currentEF = (currentNP > 0 && currentHR > 0) ? (currentNP / currentHR) : 0;
 
     if (avgHistoricalNP > 0 && currentNP > 0) {
@@ -56,10 +67,23 @@ export function findComparableSessions(
       hrDifferencePercent = ((currentHR - avgHistoricalHR) / avgHistoricalHR) * 100;
     }
 
-    // EF change is absolute ratio difference. Positive means better efficiency (more power per beat)
     if (avgHistoricalEF > 0 && currentEF > 0) {
       efficiencyFactorChange = currentEF - avgHistoricalEF;
     }
+  }
+
+  // Build a summary markdown for the AM/PM sessions
+  let summary = "";
+  if (focusSessions.length > 1) {
+      summary = `Detectadas **${focusSessions.length} sesiones** para este día:\n`;
+      focusSessions.forEach((s, i) => {
+          const mins = Math.round((s.raw.moving_time || 0) / 60);
+          summary += `- Sesión ${i+1}: ${s.raw.name || "Actividad"} (${mins} min, ${Math.round(s.raw.tss || 0)} TSS)\n`;
+      });
+  } else if (focusSessions.length === 1) {
+      const s = focusSessions[0];
+      const mins = Math.round((s.raw.moving_time || 0) / 60);
+      summary = `Análisis de sesión única: **${s.raw.name || "Actividad"}** (${mins} min, ${Math.round(s.raw.tss || 0)} TSS).`;
   }
 
   return {
@@ -69,6 +93,7 @@ export function findComparableSessions(
       npDifferencePercent,
       hrDifferencePercent,
       efficiencyFactorChange
-    }
+    },
+    sessionSummaryMarkdown: summary
   };
 }

@@ -1,6 +1,8 @@
 // src/lib/metricsUtils.ts
 
-export type Activity = any; // Representa una fila de la BD 'activities'
+import { ActivitySummary } from './activityTypes';
+
+export type Activity = ActivitySummary;
 
 // Función auxiliar para obtener la carga de una actividad individual
 export function getActivityLoad(activity: Activity): number {
@@ -25,12 +27,29 @@ export function getLocalYYYYMMDD(dateObj: Date): string {
     return `${yyyy}-${mm}-${dd}`;
 }
 
+/**
+ * Extrae la fecha local (YYYY-MM-DD) de un campo activity_date que puede venir en dos formatos:
+ *   1. "2026-03-18"                     (solo fecha, se usa directamente sin pasar por Date)
+ *   2. "2026-03-19T01:02:39+00:00"      (ISO UTC con hora, se convierte a hora local primero)
+ * Esto evita que un entreno a las 22:00 en Chile (UTC-3) quede registrado el día siguiente.
+ */
+export function getActivityLocalDate(activityDate: any): string {
+    const str = String(activityDate);
+    // Si es solo fecha (10 chars ó formato YYYY-MM-DD sin hora), la usamos directamente
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str.slice(0, 10)) && str.length === 10) {
+        return str;
+    }
+    // Tiene componente de hora: parseamos como Date (respeta la zona horaria del string)
+    // y luego extraemos en hora LOCAL del navegador del usuario.
+    return getLocalYYYYMMDD(new Date(str));
+}
+
 // Agrupar carga por día (formato YYYY-MM-DD)
 export function getDailyLoads(activities: Activity[]): Record<string, number> {
     const daily: Record<string, number> = {};
     activities.forEach(act => {
         if (!act.activity_date) return;
-        const dateStr = getLocalYYYYMMDD(new Date(act.activity_date));
+        const dateStr = getActivityLocalDate(act.activity_date);
         daily[dateStr] = (daily[dateStr] || 0) + getActivityLoad(act);
     });
     return daily;
@@ -217,18 +236,21 @@ export function getLoadLastNDays(dailyLoads: Record<string, number>, days: numbe
 
 // Conteo de sesiones en los últimos 7 días para ser consistente con Carga 7D
 export function getSessionsLast7Days(activities: Activity[]): number {
+    // Generamos el set de fechas (YYYY-MM-DD) de los últimos 7 días en hora LOCAL
+    const localDates = new Set<string>();
     const today = new Date();
-    const endOfToday = new Date(today.setHours(23, 59, 59, 999));
-
-    const startOfWindow = new Date(today);
-    startOfWindow.setDate(today.getDate() - 6); // 7 días inclusive (hoy y 6 previos)
-    startOfWindow.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        localDates.add(getLocalYYYYMMDD(d));
+    }
 
     let count = 0;
     activities.forEach(act => {
         if (!act.activity_date) return;
-        const actDate = new Date(act.activity_date);
-        if (actDate >= startOfWindow && actDate <= endOfToday) {
+        // Convertir a hora local antes de comparar
+        const dateStr = getActivityLocalDate(act.activity_date);
+        if (localDates.has(dateStr)) {
             count++;
         }
     });
@@ -239,44 +261,110 @@ export function getSessionsLast7Days(activities: Activity[]): number {
 export function getWeeklyVolumeBreakdown(activities: Activity[]) {
     const today = new Date();
 
-    // Normalizar a medianoche para evitar problemas horarios
-    const endOfToday = new Date(today.setHours(23, 59, 59, 999));
+    // Calcular los YYYY-MM-DD strings para comparar sin pasar por UTC
+    const todayStr = getLocalYYYYMMDD(today);
 
-    const startOfCurrentWeek = new Date(today);
-    startOfCurrentWeek.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1)); // Lunes
-    startOfCurrentWeek.setHours(0, 0, 0, 0);
+    const startOfCurrentWeekDate = new Date(today);
+    startOfCurrentWeekDate.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1)); // Lunes
+    startOfCurrentWeekDate.setHours(0, 0, 0, 0);
+    const currentWeekStart = getLocalYYYYMMDD(startOfCurrentWeekDate);
 
-    const startOfLastWeek = new Date(startOfCurrentWeek);
-    startOfLastWeek.setDate(startOfCurrentWeek.getDate() - 7);
+    const startOfLastWeekDate = new Date(startOfCurrentWeekDate);
+    startOfLastWeekDate.setDate(startOfCurrentWeekDate.getDate() - 7);
+    const lastWeekStart = getLocalYYYYMMDD(startOfLastWeekDate);
 
-    const endOfLastWeek = new Date(startOfCurrentWeek);
-    endOfLastWeek.setMilliseconds(-1);
+    const endOfLastWeekDate = new Date(startOfCurrentWeekDate);
+    endOfLastWeekDate.setDate(endOfLastWeekDate.getDate() - 1);
+    const lastWeekEnd = getLocalYYYYMMDD(endOfLastWeekDate);
 
-    let currentWeekMins = 0;
-    let lastWeekMins = 0;
+    let currentWeekMinutes = 0;
+    let lastWeekMinutes = 0;
 
     activities.forEach(act => {
         if (!act.activity_date) return;
-        const actDate = new Date(act.activity_date);
+        const actLocalDate = getActivityLocalDate(act.activity_date);
         const mins = Number(act.duration_minutes) || 0;
 
-        if (actDate >= startOfCurrentWeek && actDate <= endOfToday) {
-            currentWeekMins += mins;
-        } else if (actDate >= startOfLastWeek && actDate <= endOfLastWeek) {
-            lastWeekMins += mins;
+        if (actLocalDate >= currentWeekStart && actLocalDate <= todayStr) {
+            currentWeekMinutes += mins;
+        } else if (actLocalDate >= lastWeekStart && actLocalDate <= lastWeekEnd) {
+            lastWeekMinutes += mins;
         }
     });
 
     return {
-        currentWeek: Math.round(currentWeekMins / 60 * 10) / 10, // horas con 1 decimal
-        lastWeek: Math.round(lastWeekMins / 60 * 10) / 10
+        currentWeekHours: Math.floor(currentWeekMinutes / 60),
+        currentWeekMins: Math.round(currentWeekMinutes % 60),
+        lastWeekHours: Math.floor(lastWeekMinutes / 60),
+        lastWeekMins: Math.round(lastWeekMinutes % 60),
+        trend: currentWeekMinutes >= lastWeekMinutes ? 'up' : 'down'
     };
+}
+
+// Extrae el historial diario de Potencia Promedio y Potencia Normalizada de los últimos N días
+export function getPowerHistory(activities: Activity[], days: number = 90) {
+    const today = new Date();
+    const todayStr = getLocalYYYYMMDD(today);
+    
+    const startOfWindowDate = new Date(today);
+    startOfWindowDate.setDate(today.getDate() - days + 1);
+    const startStr = getLocalYYYYMMDD(startOfWindowDate);
+
+    // Agrupar la potencia máxima media registrada por día
+    const daily: Record<string, { avgPower: number, np: number, p20: number }> = {};
+    
+    activities.forEach(act => {
+        if (!act.activity_date) return;
+        const dateStr = getActivityLocalDate(act.activity_date);
+        
+        if (dateStr >= startStr && dateStr <= todayStr) {
+            
+            // Tratamos de obtener np (normalized_power o np del CSV) y potencia_media o average_power
+            const actAvgPower = Number(act.potencia_media || act.average_power || 0);
+            const actNP = Number(act.np || act.normalized_power || 0);
+            const actP20 = Number(act.potencia_20min || 0);
+
+            if (!daily[dateStr]) {
+                daily[dateStr] = { avgPower: actAvgPower, np: actNP, p20: actP20 };
+            } else {
+                // Si hizo doble sesión, guardamos el esfuerzo más pesado o promediamos. 
+                // Por ahora, para simplificar visualmente en el gráfico, guardamos de la sesión más fuerte.
+                daily[dateStr].avgPower = Math.max(daily[dateStr].avgPower, actAvgPower);
+                daily[dateStr].np = Math.max(daily[dateStr].np, actNP);
+                daily[dateStr].p20 = Math.max(daily[dateStr].p20, actP20);
+            }
+        }
+    });
+
+    // Rellenamos los días para que el gráfico sea continuo
+    const history: { date: string, avgPower: number | null, np: number | null, p20: number | null }[] = [];
+    
+    for (let i = days - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = getLocalYYYYMMDD(d);
+        
+        if (daily[dateStr] && daily[dateStr].avgPower > 0) {
+            history.push({ 
+                date: dateStr, 
+                avgPower: Math.round(daily[dateStr].avgPower),
+                np: daily[dateStr].np > 0 ? Math.round(daily[dateStr].np) : null,
+                p20: daily[dateStr].p20 > 0 ? Math.round(daily[dateStr].p20) : null
+            });
+        } else {
+            // Null rompe las líneas para que no asuma 0W en días de descanso.
+            history.push({ date: dateStr, avgPower: null, np: null, p20: null });
+        }
+    }
+
+    return history;
 }
 
 // Distribución por zonas muy básica (basada en FC media si existe, o clasificar por intensidad)
 export function getZoneDistribution(activities: Activity[], daysBack: number = 30) {
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() - daysBack);
+    const targetDateStr = getLocalYYYYMMDD(targetDate);
 
     let z1z2 = 0; // Recuperación / Base
     let z3z4 = 0; // Tempo / Umbral
@@ -284,7 +372,8 @@ export function getZoneDistribution(activities: Activity[], daysBack: number = 3
 
     activities.forEach(act => {
         if (!act.activity_date) return;
-        if (new Date(act.activity_date) < targetDate) return;
+        const dateStr = getActivityLocalDate(act.activity_date);
+        if (dateStr < targetDateStr) return;
 
         const hr = act.fc_media ? Number(act.fc_media) : 0;
 

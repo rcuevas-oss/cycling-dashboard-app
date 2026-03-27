@@ -1,91 +1,163 @@
 import { useState, useEffect } from 'react'
 import { AuthUI } from './components/AuthUI'
 import { Dashboard } from './components/Dashboard'
+import { MyPlanCalendar } from './components/MyPlanCalendar'
 import { AthleteProfile } from './components/AthleteProfile'
 import { OnboardingWizard } from './components/OnboardingWizard'
 import { TrainingPlanner } from './components/TrainingPlanner'
 import { AICoachModal } from './components/AICoachModal'
 import { AICoachPanel } from './components/AICoachPanel'
 import { LandingPage } from './components/LandingPage'
-import { Bot, User, LogOut, ChevronDown } from 'lucide-react'
+import { FitParserTest } from './components/FitParserTest'
+import { FitMigrationModal } from './components/FitMigrationModal'
+import { Bot, User, LogOut, ChevronDown, FlaskConical } from 'lucide-react'
 import { SiGithub } from 'react-icons/si'
 import { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
-import { TrainingBlock } from './lib/fitUtils'
+import { ActivitySummary, UserIngestionState } from './lib/activityTypes'
+
+function isMissingRelationError(error: { code?: string; message?: string } | null) {
+    if (!error) return false
+    return error.code === 'PGRST205' || error.code === '42P01' || error.message?.toLowerCase().includes('could not find the table') || false
+}
 
 export default function App() {
     const [session, setSession] = useState<Session | null>(null)
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'planner'>('dashboard')
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'my_plan' | 'planner' | 'fit_test'>('dashboard')
     const [isAIModalOpen, setIsAIModalOpen] = useState(false)
     const [showAuth, setShowAuth] = useState(false)
     const [showProfile, setShowProfile] = useState(false)
     const [showUserMenu, setShowUserMenu] = useState(false)
+    const [isTabTransitioning, setIsTabTransitioning] = useState(false)
 
     // Estados Globales (Caché en Memoria Viva)
     const [globalProfile, setGlobalProfile] = useState<any>(null)
-    const [globalActivities, setGlobalActivities] = useState<any[]>([])
+    const [globalActivities, setGlobalActivities] = useState<ActivitySummary[]>([])
+    const [ingestionState, setIngestionState] = useState<UserIngestionState | null>(null)
     const [isLoadingData, setIsLoadingData] = useState(true)
+    const isFitTestEnabled = import.meta.env.DEV
 
-    // Estado global del planificador para que la IA pueda inyectar rutinas (Formato YYYY-MM-DD)
-    const [schedule, setSchedule] = useState<Record<string, TrainingBlock[]>>({})
+
 
     // Función Centralizada para Recargar el Contexto desde Supabase
     const refreshGlobalData = async () => {
-        if (!session) return;
-        setIsLoadingData(true);
-
-        // 1. Descargar Perfil
-        const { data: profileData } = await supabase
-            .from('athlete_profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-
-        if (profileData) {
-            setGlobalProfile(profileData);
-        } else {
-            setGlobalProfile(null);
+        if (!session) {
+            setGlobalProfile(null)
+            setGlobalActivities([])
+            setIngestionState(null)
+            setIsLoadingData(false)
+            return
         }
 
-        // 2. Descargar Actividades (Limitadas a las últimas 50 para rendimiento y IA)
-        const { data: actsData } = await supabase
-            .from('activities')
-            .select('*')
-            .order('activity_date', { ascending: false })
-            .limit(50);
-        if (actsData) setGlobalActivities(actsData);
+        setIsLoadingData(true)
 
-        setIsLoadingData(false);
+        const userId = session.user.id
+        const [
+            { data: profileData },
+            modernActivitiesResult,
+            legacyActivitiesResult,
+            { data: ingestionData, error: ingestionError },
+        ] = await Promise.all([
+            supabase
+                .from('athlete_profiles')
+                .select('*')
+                .eq('id', userId)
+                .maybeSingle(),
+            supabase
+                .from('activity_summaries')
+                .select('*')
+                .eq('user_id', userId)
+                .order('activity_date', { ascending: false })
+                .limit(150),
+            supabase
+                .from('activities')
+                .select('*')
+                .eq('user_id', userId)
+                .order('activity_date', { ascending: false })
+                .limit(150),
+            supabase
+                .from('user_ingestion_state')
+                .select('user_id, requires_fit_resync, first_fit_synced_at, migration_notice_dismissed_at')
+                .eq('user_id', userId)
+                .maybeSingle(),
+        ])
+
+        let resolvedActivities: ActivitySummary[] = []
+
+        if (!legacyActivitiesResult.error && (legacyActivitiesResult.data?.length ?? 0) > 0) {
+            resolvedActivities = (legacyActivitiesResult.data as ActivitySummary[] | null) ?? []
+        } else if (!modernActivitiesResult.error) {
+            resolvedActivities = (modernActivitiesResult.data as ActivitySummary[] | null) ?? []
+        } else if (!legacyActivitiesResult.error) {
+            resolvedActivities = (legacyActivitiesResult.data as ActivitySummary[] | null) ?? []
+        } else if (!isMissingRelationError(modernActivitiesResult.error) && !isMissingRelationError(legacyActivitiesResult.error)) {
+            console.error('No se pudieron cargar las actividades del dashboard.', {
+                modern: modernActivitiesResult.error,
+                legacy: legacyActivitiesResult.error,
+            })
+        }
+
+        setGlobalProfile(profileData ?? null)
+        setGlobalActivities(resolvedActivities)
+
+        if (ingestionError && !isMissingRelationError(ingestionError)) {
+            console.error('No se pudo cargar user_ingestion_state.', ingestionError)
+            setIngestionState(null)
+        } else if (ingestionError) {
+            setIngestionState(null)
+        } else {
+            setIngestionState(ingestionData ?? null)
+        }
+
+        setIsLoadingData(false)
     };
 
-    // Efecto Inicial: Cargar Plan Semanal y Contexto Global al loguearse
+    // Lógica de Transición Suave entre Pestañas
+    const handleTabChange = (newTab: 'dashboard' | 'my_plan' | 'planner' | 'fit_test') => {
+        if (newTab === activeTab) return;
+        setIsTabTransitioning(true);
+        setTimeout(() => {
+            setActiveTab(newTab);
+            setTimeout(() => setIsTabTransitioning(false), 50); 
+        }, 300); 
+    };
+
     useEffect(() => {
-        const fetchSchedule = async () => {
-            if (session) {
-                const { data, error } = await supabase
-                    .from('user_schedules')
-                    .select('schedule_data')
-                    .eq('user_id', session.user.id)
-                    .single()
+        let isMounted = true
 
-                if (!error && data && data.schedule_data) {
-                    const parsed = data.schedule_data as Record<string, TrainingBlock[]>;
-                    // Migración simple: Si detecta el formato viejo de días, limpia el calendario
-                    if (Object.keys(parsed).includes('Lunes')) {
-                        console.warn("Detectado formato de calendario antiguo. Reseteando a formato de Fechas.");
-                        setSchedule({});
-                    } else {
-                        setSchedule(parsed);
-                    }
-                }
+        supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+            if (isMounted) {
+                setSession(existingSession)
             }
-        }
+        })
 
-        if (session) {
-            fetchSchedule();
-            refreshGlobalData();
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+            if (!isMounted) return
+
+            setSession(nextSession)
+
+            if (!nextSession) {
+                setGlobalProfile(null)
+                setGlobalActivities([])
+                setIngestionState(null)
+                setShowUserMenu(false)
+                setShowProfile(false)
+                setIsLoadingData(false)
+            }
+        })
+
+        return () => {
+            isMounted = false
+            subscription.unsubscribe()
         }
-    }, [session])
+    }, [])
+
+    useEffect(() => {
+        refreshGlobalData()
+    }, [session?.user.id])
+
+    const requiresOnboarding = !globalProfile || !globalProfile.ftp_actual || !globalProfile.peso_actual_kg
+    const requiresFitResync = !!session && !isLoadingData && !requiresOnboarding && !!ingestionState?.requires_fit_resync
 
     return (
         <div className={`bg-background text-zinc-100 flex items-center justify-center ${session ? 'fixed inset-0 overflow-hidden' : 'min-h-screen relative overflow-x-hidden'}`}>
@@ -110,16 +182,52 @@ export default function App() {
                     </div>
                 )
             ) : (
-                <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 transition-all duration-500 h-full flex flex-col gap-4 relative">
+                <div className={`w-full mx-auto h-full flex flex-col relative transition-opacity duration-300 ${isTabTransitioning ? 'opacity-0 scale-[0.99]' : 'opacity-100 scale-100'} ${activeTab === 'dashboard' ? 'max-w-[1600px] p-4 sm:p-6 gap-4' : 'max-w-none p-0 gap-0'}`}>
                     {/* APP HEADER MINIMALISTA */}
-                    <div className="flex justify-between items-center bg-[#111113] border border-zinc-800 rounded-2xl p-4 shadow-sm shrink-0">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                                <Bot className="w-4 h-4 text-white" />
+                    <div className={`flex justify-between items-center bg-[#111113] border-b border-zinc-800 shadow-sm shrink-0 transition-none ${activeTab === 'dashboard' ? 'rounded-2xl p-4 border' : 'p-4'}`}>
+                        <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                    <Bot className="w-4 h-4 text-white" />
+                                </div>
+                                <h1 className="text-xl font-bold tracking-tight hidden sm:block">
+                                    Cycling <span className="text-garmin-blue">Pro</span>
+                                </h1>
                             </div>
-                            <h1 className="text-xl font-bold tracking-tight hidden sm:block">
-                                Cycling <span className="text-garmin-blue">Pro</span>
-                            </h1>
+
+                            {/* Pestañas de Navegación Internas Integradas en el Header */}
+                            <div className="flex gap-1 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800/50">
+                                <button
+                                    onClick={() => handleTabChange('dashboard')}
+                                    disabled={isTabTransitioning}
+                                    className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30'}`}
+                                >
+                                    Dashboard
+                                </button>
+                                <button
+                                    onClick={() => handleTabChange('my_plan')}
+                                    disabled={isTabTransitioning}
+                                    className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'my_plan' ? 'bg-garmin-blue/20 text-garmin-blue shadow-sm' : 'text-zinc-500 hover:text-garmin-blue hover:bg-garmin-blue/10'}`}
+                                >
+                                    Mi Plan
+                                </button>
+                                <button
+                                    onClick={() => handleTabChange('planner')}
+                                    disabled={isTabTransitioning}
+                                    className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'planner' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30'}`}
+                                >
+                                    VeloFlow AI
+                                </button>
+                                {isFitTestEnabled && (
+                                    <button
+                                        onClick={() => handleTabChange('fit_test')}
+                                        disabled={isTabTransitioning}
+                                        className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all flex items-center gap-1.5 ${activeTab === 'fit_test' ? 'bg-indigo-600/20 text-indigo-400 shadow-sm border border-indigo-500/30' : 'text-zinc-500 hover:text-indigo-400 hover:bg-indigo-500/10'}`}
+                                    >
+                                        <FlaskConical className="w-3.5 h-3.5" /> FIT Test
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* Menú de Usuario Compacto */}
@@ -174,45 +282,34 @@ export default function App() {
                         <div className="flex-1 w-full flex items-center justify-center">
                             <div className="animate-spin w-10 h-10 border-4 border-zinc-800 border-t-garmin-blue rounded-full"></div>
                         </div>
-                    ) : (!globalProfile || !globalProfile.ftp_actual || !globalProfile.peso_actual_kg) ? (
+                    ) : requiresOnboarding ? (
                         <OnboardingWizard session={session} initialProfile={globalProfile} onComplete={refreshGlobalData} />
                     ) : (
-                        <div className="flex-1 w-full flex flex-col lg:flex-row gap-6 overflow-hidden min-h-0">
+                        <div className={`flex-1 w-full flex flex-col lg:flex-row overflow-hidden min-h-0 ${activeTab === 'dashboard' ? 'gap-6' : 'gap-0'}`}>
                             {/* COLUMNA IZQUIERDA: Herramientas (Dashboard / Planner) */}
-                            <div className="w-full lg:w-[65%] xl:w-[70%] flex flex-col h-full bg-[#111113] border border-zinc-800 rounded-2xl overflow-hidden p-4 sm:p-6 shadow-xl relative">
+                            <div className={`w-full ${activeTab === 'dashboard' ? 'lg:w-[65%] xl:w-[70%] p-4 sm:p-6 rounded-2xl border' : 'lg:w-full p-0 sm:p-0'} flex flex-col h-full bg-[#111113] border-zinc-800 overflow-hidden shadow-xl relative`}>
 
-                                {/* Pestañas de Navegación Internas (Minimalistas) */}
-                                <div className="flex gap-2 mb-6 bg-zinc-900/50 p-1.5 rounded-xl border border-zinc-800/50 w-fit shrink-0">
-                                    <button
-                                        onClick={() => setActiveTab('dashboard')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30'}`}
-                                    >
-                                        Dashboard
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('planner')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'planner' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30'}`}
-                                    >
-                                        Planificador
-                                    </button>
-                                </div>
+                                {/* Pestañas eliminadas de aquí */}
 
-                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20 lg:pb-0">
+                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20 lg:pb-8 relative">
                                     {activeTab === 'dashboard' && <Dashboard session={session} activities={globalActivities} onDataChanged={refreshGlobalData} />}
-                                    {activeTab === 'planner' && <TrainingPlanner schedule={schedule} setSchedule={setSchedule} session={session} profile={globalProfile} />}
+                                    {activeTab === 'my_plan' && <MyPlanCalendar session={session} />}
+                                    {activeTab === 'planner' && <TrainingPlanner session={session} profile={globalProfile} activities={globalActivities} />}
+                                    {activeTab === 'fit_test' && isFitTestEnabled && <FitParserTest />}
                                 </div>
                             </div>
 
-                            {/* COLUMNA DERECHA: AI Coach Center (Solo visible nativamente en LG) */}
-                            <div className="hidden lg:flex w-full lg:w-[35%] xl:w-[30%] h-full">
-                                <AICoachPanel
-                                    session={session}
-                                    athleteProfile={globalProfile}
-                                    recentActivitiesData={globalActivities}
-                                    onApplyPlan={(plan) => setSchedule(plan)}
-                                    onNavigate={(v) => setActiveTab(v as any)}
-                                />
-                            </div>
+                            {/* COLUMNA DERECHA: AI Coach Center (Solo visible nativamente en LG y en Dashboard) */}
+                            {activeTab === 'dashboard' && (
+                                <div className="hidden lg:flex w-full lg:w-[35%] xl:w-[30%] h-full">
+                                    <AICoachPanel
+                                        session={session}
+                                        athleteProfile={globalProfile}
+                                        recentActivitiesData={globalActivities}
+                                        onNavigate={(v) => setActiveTab(v as any)}
+                                    />
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -234,6 +331,13 @@ export default function App() {
                             </div>
                         </div>
                     )}
+
+                    {requiresFitResync && (
+                        <FitMigrationModal
+                            session={session}
+                            onSyncComplete={refreshGlobalData}
+                        />
+                    )}
                 </div>
             )}
 
@@ -250,7 +354,6 @@ export default function App() {
                     <AICoachModal
                         isOpen={isAIModalOpen}
                         onClose={() => setIsAIModalOpen(false)}
-                        onApplyPlan={(plan) => setSchedule(plan)}
                         session={session}
                         athleteProfile={globalProfile}
                         recentActivitiesData={globalActivities}

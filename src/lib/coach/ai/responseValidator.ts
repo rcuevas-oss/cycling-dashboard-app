@@ -20,8 +20,7 @@ export function validateLLMResponse(rawString: string): CoachResponseSchema {
 
     // 3. Schema defaults and enforcement
     const validated: CoachResponseSchema = {
-        textMarkdown: typeof parsed.textMarkdown === "string" ? parsed.textMarkdown : "Hubo un error interpretando el análisis fisiológico.",
-        generatedPlan: Array.isArray(parsed.generatedPlan) ? parsed.generatedPlan : null
+        textMarkdown: typeof parsed.textMarkdown === "string" ? parsed.textMarkdown : "Hubo un error interpretando el análisis fisiológico."
     };
 
     return validated;
@@ -32,7 +31,6 @@ export function validateLLMResponse(rawString: string): CoachResponseSchema {
  */
 export function generateFallbackResponse(reason: string): CoachResponseSchema {
     return {
-        textMarkdown: reason || "Lo siento, tuve un problema procesando tus datos métricos en este momento. Intenta formular tu petición nuevamente.",
-        generatedPlan: null
+        textMarkdown: reason || "Lo siento, tuve un problema procesando tus datos métricos en este momento. Intenta formular tu petición nuevamente."
     };
 }

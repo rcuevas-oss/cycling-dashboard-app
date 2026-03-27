@@ -18,11 +18,11 @@ export function AuthUI({ onSessionChange }: AuthProps) {
     // This checks for existing session just like before
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) onSessionChange(session);
+            onSessionChange(session ?? null);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session) onSessionChange(session);
+            onSessionChange(session ?? null);
         });
 
         return () => subscription.unsubscribe();

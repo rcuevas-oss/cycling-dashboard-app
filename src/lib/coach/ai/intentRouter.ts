@@ -12,14 +12,15 @@ export async function detectIntent(apiKey: string, userMessage: string): Promise
 
     - GREETING: El usuario solo saluda o se despide ("Hola", "Buen día", "Gracias"). No pide nada técnico.
     - QA: Pregunta técnica, biomecánica o nutricional genérica que NO requiere revisar sus métricas pasadas (Ej: "¿Cómo funciona el FTP?", "¿Qué comer antes de entrenar?", "¿A qué cadencia debo ir en subida?").
-    - ANALYZE_SESSION: Pregunta específicamente por cómo le fue en un entrenamiento reciente o particular (Ej: "Ayer entrené, ¿qué tal?", "Analiza el fondo del domingo", "Mira mi salida de hoy").
-    - ANALYZE_FORM: Pregunta por su estado de forma general, fatiga o sensaciones corporales amplias (Ej: "¿Cómo vengo?", "Siento las piernas pesadas", "¿Estoy listo para correr el fin de semana?").
-    - PLAN_REQUEST: Pide concretamente la creación o ajuste de un calendario/plan de entrenamiento (Ej: "Arma mi semana", "Plan para los próximos 14 días", "Organiza mi entrenamiento").
-    - AMBIGUOUS: Cualquier otra interacción confusa o un pedido de plan que no especifique temporalidad ("Quiero un plan" a secas).
+    - DATA_SCIENCE: El usuario pide comparar datos pasados, analizar su eficiencia aeróbica, buscar correlaciones entre métricas (TSS, IF, EF, W/kg, NP vs HR), analizar tiempos de recuperación matemática, o realizar cálculos estadísticos finos. Si la consulta se siente "matemática", "analítica" o menciona "eficiencia" y "cruzar datos", es DATA_SCIENCE.
+    - ANALYZE_SESSION: Pregunta específicamente por cómo le fue en un entrenamiento reciente (Ej: "Ayer entrené, ¿qué tal?"). Busca un COACH táctico y humano.
+    - ANALYZE_FORM: Pregunta por su estado de forma general, fatiga táctica o readiness (Ej: "¿Siento las piernas pesadas?", "¿Estoy listo para correr?"). Busca un COACH.
+    - PLAN_REQUEST: Pide concretamente la creación o ajuste de un calendario/plan de entrenamiento.
+    - AMBIGUOUS: Cualquier otra interacción confusa.
 
     Debes responder ÚNICAMENTE con un objeto JSON válido (sin Markdown \`\`\`json) siguiendo esta estructura exacta:
     {
-       "type": "GREETING" | "QA" | "ANALYZE_SESSION" | "ANALYZE_FORM" | "PLAN_REQUEST" | "AMBIGUOUS",
+       "type": "GREETING" | "QA" | "DATA_SCIENCE" | "ANALYZE_SESSION" | "ANALYZE_FORM" | "PLAN_REQUEST" | "AMBIGUOUS",
        "targetTimeframeDays": number | null, 
        "focusSessionDateStr": string | null
     }
@@ -34,7 +35,7 @@ export async function detectIntent(apiKey: string, userMessage: string): Promise
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-1.5-flash", // Modelo rápido y barato para routing
+            model: "gemini-2.5-flash", // Utilizando el modelo más rápido disponible en este tier
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             config: {
                 temperature: 0.1,
@@ -47,10 +48,10 @@ export async function detectIntent(apiKey: string, userMessage: string): Promise
         const data = JSON.parse(cleanJson);
 
         // Map strictly to IntentType
-        const allowedTypes: IntentType[] = ["GREETING", "QA", "ANALYZE_SESSION", "ANALYZE_FORM", "PLAN_REQUEST", "AMBIGUOUS"];
+        const allowedTypes: IntentType[] = ["GREETING", "QA", "ANALYZE_SESSION", "ANALYZE_FORM", "DATA_SCIENCE", "PLAN_REQUEST", "AMBIGUOUS"];
         const type: IntentType = allowedTypes.includes(data.type) ? data.type : "AMBIGUOUS";
 
-        const requiresHistoricalData = type === "ANALYZE_SESSION" || type === "ANALYZE_FORM" || type === "PLAN_REQUEST";
+        const requiresHistoricalData = type === "ANALYZE_SESSION" || type === "ANALYZE_FORM" || type === "DATA_SCIENCE" || type === "PLAN_REQUEST";
 
         return {
             type,

@@ -1,0 +1,127 @@
+.sidebar {
+  width: 240px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-color);
+  border-radius: 0;
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  z-index: 10;
+  background-color: var(--bg-surfaces);
+}
+
+.sidebar-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h2 {
+  font-size: 1.25rem;
+  margin-bottom: 4px;
+}
+
+.sidebar-header p {
+  font-size: 0.85rem;
+}
+
+.nodes-container {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.library-node {
+  display: flex;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: grab;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.library-node:active {
+  cursor: grabbing;
+}
+
+.library-node:hover {
+  border-color: var(--border-focus);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.library-node::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+}
+
+/* Hardcoded immersive zone colors for the library blocks to match TrainingNode.css */
+.library-node.zone-rest { background-color: rgba(161, 161, 170, 0.15); border-color: rgba(161, 161, 170, 0.5); }
+.library-node.zone-rest::before { background-color: #a1a1aa; }
+
+.library-node.zone-recovery { background-color: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.5); }
+.library-node.zone-recovery::before { background-color: #3b82f6; }
+
+.library-node.zone-endurance { background-color: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.5); }
+.library-node.zone-endurance::before { background-color: #10b981; }
+
+.library-node.zone-tempo { background-color: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.5); }
+.library-node.zone-tempo::before { background-color: #f59e0b; }
+
+.library-node.zone-threshold { background-color: rgba(234, 88, 12, 0.15); border-color: rgba(234, 88, 12, 0.5); }
+.library-node.zone-threshold::before { background-color: #ea580c; }
+
+.library-node.zone-vo2max { background-color: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.5); }
+.library-node.zone-vo2max::before { background-color: #ef4444; }
+
+.library-node.zone-anaerobic { background-color: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.5); }
+.library-node.zone-anaerobic::before { background-color: #a855f7; }
+
+.library-node-grabber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  color: var(--border-focus);
+  cursor: inherit;
+}
+
+.library-node-content {
+  padding: 12px 12px 12px 4px;
+  flex: 1;
+}
+
+.library-node-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.library-node-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.library-node-stats .stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

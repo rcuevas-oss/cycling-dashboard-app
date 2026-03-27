@@ -22,8 +22,6 @@ export function OnboardingWizard({ session, initialProfile, onComplete }: Onboar
         pesoActual: string;
         disciplina: string;
         objetivo: string;
-        diasDisponibles: string[];
-        horasPorDia: Record<string, string>;
         ftpActual: string;
     }>({
         nombre: initialProfile?.nombre || '',
@@ -32,10 +30,6 @@ export function OnboardingWizard({ session, initialProfile, onComplete }: Onboar
         pesoActual: initialProfile?.peso_actual_kg?.toString() || '',
         disciplina: initialProfile?.disciplina || 'Ruta',
         objetivo: initialProfile?.objetivo || 'Mantenimiento / Fitness General',
-        diasDisponibles: [],
-        horasPorDia: {
-            'Lunes': '1.5', 'Martes': '1.5', 'Miércoles': '1.5', 'Jueves': '1.5', 'Viernes': '1.5', 'Sábado': '2', 'Domingo': '2'
-        },
         ftpActual: initialProfile?.ftp_actual?.toString() || '',
     });
 
@@ -59,10 +53,6 @@ export function OnboardingWizard({ session, initialProfile, onComplete }: Onboar
             setError('Por favor, selecciona tu disciplina.');
             return;
         }
-        if (step === 4 && formData.diasDisponibles.length === 0) {
-            setError('Por favor, selecciona al menos un día de disponibilidad.');
-            return;
-        }
         setStep(s => s + 1);
         setError('');
     };
@@ -82,17 +72,11 @@ export function OnboardingWizard({ session, initialProfile, onComplete }: Onboar
         setError('');
 
         try {
-            // Construir string final interactivo
-            const disponibilidadFinal = formData.diasDisponibles.length > 0
-                ? formData.diasDisponibles.map(d => `${d} (${formData.horasPorDia[d] || '1.5'}h)`).join(', ')
-                : 'No especificado';
-
             // Upsert Profile
             const profileData = {
                 id: session.user.id,
                 ...formData,
-                disponibilidad: disponibilidadFinal,
-                fecha_evento: initialProfile?.fecha_evento || null, // Keep existing if any, not asked here
+                fecha_evento: initialProfile?.fecha_evento || null,
                 ftp_actual: Number(formData.ftpActual),
                 peso_actual_kg: Number(formData.pesoActual),
                 altura_cm: Number(formData.altura),
@@ -103,8 +87,6 @@ export function OnboardingWizard({ session, initialProfile, onComplete }: Onboar
             delete (profileData as any).ftpActual;
             delete (profileData as any).pesoActual;
             delete (profileData as any).altura;
-            delete (profileData as any).diasDisponibles;
-            delete (profileData as any).horasPorDia;
 
             if (session.user.id !== 'offline-demo-user') {
                 const { error: profileError } = await supabase
@@ -143,8 +125,7 @@ export function OnboardingWizard({ session, initialProfile, onComplete }: Onboar
             { num: 1, label: 'Identidad' },
             { num: 2, label: 'Físico' },
             { num: 3, label: 'Perfil' },
-            { num: 4, label: 'Horarios' },
-            { num: 5, label: 'Motor' }
+            { num: 4, label: 'Motor' }
         ];
 
         return (
@@ -331,72 +312,9 @@ export function OnboardingWizard({ session, initialProfile, onComplete }: Onboar
                         </div>
                     )}
 
-                    {/* STEP 4: Horarios y Disponibilidad */}
+
+                    {/* STEP 4: FTP (El Motor) */}
                     {step === 4 && (
-                        <div className="animate-in slide-in-from-right-8 fade-in duration-500">
-                            <div className="text-center mb-8">
-                                <h2 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                                    <Activity className="w-6 h-6 text-purple-400" /> Disponibilidad
-                                </h2>
-                                <p className="text-zinc-500">¿De cuánto tiempo a la semana dispone tu motor?</p>
-                            </div>
-
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="block text-sm font-bold text-zinc-300 mb-4 uppercase tracking-wider text-center">Selecciona tus días libres</label>
-                                    <div className="flex flex-wrap gap-2 sm:gap-3 justify-center">
-                                        {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(dia => {
-                                            const mapFull = { 'L': 'Lunes', 'M': 'Martes', 'X': 'Miércoles', 'J': 'Jueves', 'V': 'Viernes', 'S': 'Sábado', 'D': 'Domingo' } as Record<string, string>;
-                                            const fullDay = mapFull[dia];
-                                            const isSelected = formData.diasDisponibles.includes(fullDay);
-                                            return (
-                                                <button
-                                                    key={dia}
-                                                    onClick={() => setFormData(p => ({
-                                                        ...p,
-                                                        diasDisponibles: isSelected ? p.diasDisponibles.filter(d => d !== fullDay) : [...p.diasDisponibles, fullDay]
-                                                    }))}
-                                                    className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl font-black text-lg transition-all duration-300 ${isSelected ? 'bg-purple-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)] scale-110 ring-2 ring-purple-500/50' : 'bg-[#161618] border border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300 hover:bg-[#1a1a1c]'}`}
-                                                >
-                                                    {dia}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                                {formData.diasDisponibles.length > 0 && (
-                                    <div className="bg-[#161618] p-6 rounded-3xl border border-zinc-800/80 flex flex-col items-center justify-center max-w-2xl mx-auto shadow-xl mt-6 animate-in fade-in zoom-in-95">
-                                        <label className="block text-sm font-bold text-purple-400 mb-4 text-center">Ajusta tus horas para cada día seleccionado</label>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full">
-                                            {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-                                                .filter(d => formData.diasDisponibles.includes(d))
-                                                .map(dia => (
-                                                    <div key={dia} className="flex items-center justify-between bg-[#111113] border border-zinc-700/50 rounded-2xl p-2.5">
-                                                        <span className="font-bold text-zinc-300 ml-2">{dia}</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <input
-                                                                type="number"
-                                                                value={formData.horasPorDia[dia] || '1.5'}
-                                                                onChange={(e) => setFormData(p => ({
-                                                                    ...p,
-                                                                    horasPorDia: { ...p.horasPorDia, [dia]: e.target.value }
-                                                                }))}
-                                                                className="w-16 bg-[#1a1a1c] border border-zinc-700 rounded-xl p-1.5 text-white text-lg font-black text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all shadow-inner"
-                                                                step="0.5" min="0.5" max="10"
-                                                            />
-                                                            <span className="text-zinc-500 text-xs font-bold uppercase mr-1">hrs</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* STEP 5: FTP (El Motor) */}
-                    {step === 5 && (
                         <div className="animate-in slide-in-from-right-8 fade-in duration-500">
                             <div className="text-center mb-8">
                                 <h2 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
@@ -459,7 +377,7 @@ export function OnboardingWizard({ session, initialProfile, onComplete }: Onboar
                         <div></div> // Spacer
                     )}
 
-                    {step < 5 ? (
+                    {step < 4 ? (
                         <button
                             onClick={nextStep}
                             className="bg-purple-600 hover:bg-purple-500 text-white px-8 py-4 rounded-2xl font-bold text-sm flex items-center gap-2 transition-all duration-300 hover:scale-[1.02] shadow-[0_0_20px_rgba(168,85,247,0.3)] ring-1 ring-purple-500/50"

@@ -1,31 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bot, Sparkles, Send, Zap, X } from 'lucide-react';
-import { TrainingBlock } from '../lib/fitUtils';
+import { Bot, Send, Zap, X, Download } from 'lucide-react';
 import { runCoachPipeline } from '../lib/coach/pipeline';
-import { TRAINING_BLOCKS } from './TrainingPlanner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import { ActivitySummary } from '../lib/activityTypes';
+import { buildCoachActivityDataset } from '../lib/coachActivityAdapter';
 
 interface AICoachModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onApplyPlan?: (plan: Record<string, TrainingBlock[]>) => void;
     session: Session;
     athleteProfile?: any;
-    recentActivitiesData?: any[];
+    recentActivitiesData?: ActivitySummary[];
 }
 
 interface ChatMessage {
     id: string;
     role: 'user' | 'ai';
     content: string;
-    plan?: Record<string, TrainingBlock[]>;
     isGreeting?: boolean;
 }
 
-export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athleteProfile, recentActivitiesData }: AICoachModalProps) {
+export function AICoachModal({ isOpen, onClose, session, athleteProfile, recentActivitiesData }: AICoachModalProps) {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
     const [inputMsg, setInputMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -85,79 +82,35 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athletePro
                 disponibilidad_semanal: athleteProfile?.disponibilidad || "Disponibilidad completa (Acepta cualquier día, asume 1-2h diarias)."
             };
 
-            // Cálculo robusto de carga para Gemini (Ventanas Móviles Sencillas)
-            const hoy = new Date();
-            let tss7d = 0;
-            let tss42d = 0;
-            let mins7d = 0;
-
-            const recentActivities = (recentActivitiesData || []).map(act => {
-                if (act.activity_date) {
-                    const diffTime = Math.abs(hoy.getTime() - new Date(act.activity_date).getTime());
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                    const tss = typeof act.training_stress_score === 'number' ? act.training_stress_score : 0;
-                    const mins = typeof act.duration_minutes === 'number' ? act.duration_minutes : 0;
-
-                    if (diffDays <= 7) {
-                        tss7d += tss;
-                        mins7d += mins;
-                    }
-                    if (diffDays <= 42) {
-                        tss42d += tss;
-                    }
-                }
-
-                return {
-                    id: act.id || Math.random().toString(),
-                    start_date: act.activity_date || new Date().toISOString(),
-                    type: act.type || 'Ride',
-                    distance: act.distance_km ? act.distance_km * 1000 : 0,
-                    moving_time: act.duration_minutes ? act.duration_minutes * 60 : 0,
-                    elapsed_time: act.duration_minutes ? act.duration_minutes * 60 : 0,
-                    total_elevation_gain: act.ascenso_total || 0,
-                    average_speed: 0,
-                    max_speed: 0,
-                    average_heartrate: act.fc_media,
-                    max_heartrate: act.fc_maxima,
-                    normalized_power: act.normalized_power,
-                    training_stress_score: act.training_stress_score,
-                    intensity_factor: undefined,
-                    average_watts: act.potencia_media,
-                    max_watts: act.potencia_maxima,
-                    average_cadence: act.cadencia_media
-                };
-            });
+            const { recentActivities, loadSummary } = buildCoachActivityDataset(recentActivitiesData || []);
 
             // Enriquecemos el contexto del atleta con cálculos de servidor pre-digeridos
             const enrichedAthleteContext = {
                 ...athleteContext,
                 analisis_carga_backend: {
-                    tss_ultimos_7_dias_total: tss7d,
-                    tss_promedio_diario_7d: Number((tss7d / 7).toFixed(1)),
-                    volumen_diario_promedio_7d_mins: Number((mins7d / 7).toFixed(0)),
-                    ctl_estimado_42d_promedio: Number((tss42d / 42).toFixed(1)),
-                    nota_tecnica: "La IA NO DEBE calcular el ATL ni parámetros móviles manualmente, debe basarse en estos outputs."
+                    tss_ultimos_7_dias_total: loadSummary.tss7d,
+                    volumen_diario_promedio_7d_mins: loadSummary.volumenPromedio7dMins,
+                    ctl_calculado_ewma_42d: loadSummary.ctl,
+                    atl_calculado_ewma_7d: loadSummary.atl,
+                    tsb_calculado_balance_hoy: loadSummary.tsb,
+                    nota_tecnica: "La IA NO DEBE calcular el ATL ni parámetros móviles manualmente, debe basarse en estos outputs EWMA."
                 }
             };
 
-            const response = await runCoachPipeline(apiKey, newMsg, enrichedAthleteContext, recentActivities);
+            // Extraemos y mapeamos el historial limpio para inyectarle memoria a la IA
+            const historyToPass = messages
+                .filter(m => !m.id.includes('error') && !m.isGreeting)
+                .map(m => ({
+                    role: m.role === 'ai' ? 'model' : 'user' as "user" | "model",
+                    content: m.content
+                }));
 
-            let scheduledPlan: Record<string, TrainingBlock[]> | undefined = undefined;
-            if (response.generatedPlan && response.generatedPlan.length > 0) {
-                 scheduledPlan = {};
-                 response.generatedPlan.forEach(block => {
-                     if (!scheduledPlan![block.date]) scheduledPlan![block.date] = [];
-                     const template = TRAINING_BLOCKS.find(b => b.id === block.block_id);
-                     if (template) scheduledPlan![block.date].push({...template});
-                 });
-            }
+            const response = await runCoachPipeline(apiKey, newMsg, enrichedAthleteContext, recentActivities, historyToPass);
 
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
                 content: response.textMarkdown,
-                plan: scheduledPlan,
                 isGreeting: false
             }]);
         } catch (error: any) {
@@ -179,18 +132,17 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athletePro
     const ftp = athleteProfile?.ftp_actual;
     const peso = athleteProfile?.peso_actual_kg;
     let wkg: number | null = null;
-    let wkgLevelStr = '';
     let wkgColor = 'text-zinc-500';
     let wkgBg = 'bg-zinc-500/10 border-zinc-500/20';
 
     if (ftp && peso && peso > 0) {
         wkg = Number((ftp / peso).toFixed(2));
-        if (wkg < 2.5) { wkgLevelStr = 'Principiante'; wkgColor = 'text-zinc-400'; wkgBg = 'bg-zinc-500/10 border-zinc-500/50'; }
-        else if (wkg < 3.2) { wkgLevelStr = 'Aficionado'; wkgColor = 'text-emerald-400'; wkgBg = 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'; }
-        else if (wkg < 3.9) { wkgLevelStr = 'Intermedio'; wkgColor = 'text-blue-400'; wkgBg = 'bg-blue-500/10 border-blue-500/40 text-blue-400'; }
-        else if (wkg < 4.4) { wkgLevelStr = 'Avanzado'; wkgColor = 'text-indigo-400'; wkgBg = 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400'; }
-        else if (wkg < 5.0) { wkgLevelStr = 'Semipro'; wkgColor = 'text-purple-400'; wkgBg = 'bg-purple-500/10 border-purple-500/40 text-purple-400'; }
-        else { wkgLevelStr = 'Pro Tour'; wkgColor = 'text-rose-400'; wkgBg = 'bg-rose-500/10 border-rose-500/40 text-rose-400'; }
+        if (wkg < 2.5) { wkgColor = 'text-zinc-400'; wkgBg = 'bg-zinc-500/10 border-zinc-500/50'; }
+        else if (wkg < 3.2) { wkgColor = 'text-emerald-400'; wkgBg = 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'; }
+        else if (wkg < 3.9) { wkgColor = 'text-blue-400'; wkgBg = 'bg-blue-500/10 border-blue-500/40 text-blue-400'; }
+        else if (wkg < 4.4) { wkgColor = 'text-indigo-400'; wkgBg = 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400'; }
+        else if (wkg < 5.0) { wkgColor = 'text-purple-400'; wkgBg = 'bg-purple-500/10 border-purple-500/40 text-purple-400'; }
+        else { wkgColor = 'text-rose-400'; wkgBg = 'bg-rose-500/10 border-rose-500/40 text-rose-400'; }
     }
     // -------------------------------------------------------------
 
@@ -199,63 +151,55 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athletePro
             {/* Sidebar Panel */}
             <div className="w-full max-w-md h-full bg-[#111113] border-l border-zinc-800 shadow-2xl flex flex-col animate-in slide-in-from-right text-zinc-100">
 
-                {/* Header (Métricas Base movidas acá para limpieza) */}
-                <div className="flex flex-col p-5 border-b border-zinc-800 bg-[#161618]">
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                                <Bot className="w-4 h-4 text-white" />
+                {/* Header — compact single row */}
+                <div className="flex items-center gap-2 px-3 py-2.5 border-b border-zinc-800 bg-[#161618]">
+                    {/* Icon */}
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20">
+                        <Bot className="w-3.5 h-3.5 text-white" />
+                    </div>
+
+                    {/* Title */}
+                    <h2 className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400 shrink-0">
+                        AI Coach
+                    </h2>
+
+                    {/* Inline Metrics — scrollable on very small screens */}
+                    {athleteProfile ? (
+                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 min-w-0">
+                            {/* FTP */}
+                            <div className="flex items-center gap-1 bg-black/40 rounded px-1.5 py-0.5 border border-zinc-800 shrink-0">
+                                <Zap className="w-3 h-3 text-amber-500" />
+                                <span className="text-white font-bold text-[11px]">{ftp ? `${ftp}W` : '--'}</span>
                             </div>
-                            <div>
-                                <h2 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
-                                    AI Coach Pro
-                                </h2>
-                                <p className="text-[10px] uppercase tracking-wider flex items-center gap-1 text-zinc-500">
-                                    Gemini Engine
-                                </p>
+
+                            {/* Peso */}
+                            <div className="flex items-center gap-1 bg-black/40 rounded px-1.5 py-0.5 border border-zinc-800 shrink-0">
+                                <span className="text-zinc-500 font-mono text-[9px]">KG</span>
+                                <span className="text-white font-bold text-[11px]">{peso || '--'}</span>
                             </div>
+
+                            {/* W/kg Badge */}
+                            {wkg && (
+                                <div className={`flex items-center gap-1 rounded px-1.5 py-0.5 border ${wkgBg} shrink-0`}>
+                                    <span className={`font-black font-mono text-[11px] ${wkgColor}`}>{wkg}</span>
+                                    <span className="text-[8px] uppercase font-bold opacity-80">W/KG</span>
+                                </div>
+                            )}
                         </div>
-                        <button
-                            onClick={onClose}
-                            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
+                    ) : (
+                        <div className="flex-1 min-w-0">
+                            <span className="text-zinc-500 font-mono text-[10px]">Cargando...</span>
+                        </div>
+                    )}
 
-                    {/* Fila Minimal de Conexión de Datos (Colorized Metrics) */}
-                    <div className="mt-1">
-                        {athleteProfile ? (
-                            <div className="flex flex-wrap items-center gap-2 text-xs">
-                                {/* FTP */}
-                                <div className="flex items-center gap-1.5 bg-black/40 shadow-inner rounded-md px-2.5 py-1 border border-zinc-800">
-                                    <Zap className="w-3.5 h-3.5 text-amber-500" />
-                                    <span className="text-zinc-500 font-mono tracking-wider text-[10px]">FTP</span>
-                                    <span className="text-white font-bold">{ftp ? `${ftp}W` : '--'}</span>
-                                </div>
-
-                                {/* Peso */}
-                                <div className="flex items-center gap-1.5 bg-black/40 shadow-inner rounded-md px-2.5 py-1 border border-zinc-800">
-                                    <span className="text-zinc-500 font-mono tracking-wider text-[10px]">PESO</span>
-                                    <span className="text-white font-bold">{peso ? `${peso}kg` : '--'}</span>
-                                </div>
-
-                                {/* W/kg Level Badge */}
-                                {wkg && (
-                                    <div className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 border ${wkgBg} shadow-sm backdrop-blur-sm`}>
-                                        <span className={`font-black font-mono tracking-tight ${wkgColor}`}>{wkg}</span>
-                                        <span className={`text-[9px] uppercase font-bold tracking-widest opacity-90`}>{wkgLevelStr}</span>
-                                        <span className="text-[9px] uppercase font-medium opacity-60 ml-0.5">W/KG</span>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-4 text-xs bg-black/20 rounded-lg p-2 border border-zinc-800/50">
-                                <span className="text-zinc-500 font-mono tracking-wide">Vinculando Perfil Biométrico...</span>
-                            </div>
-                        )}
-                    </div>
-                </div >
+                    {/* Close */}
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors shrink-0"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
 
                 {/* Dashboard / Chat Area */}
                 <div className="flex-1 overflow-y-auto p-5 space-y-6 flex flex-col">
@@ -295,45 +239,32 @@ export function AICoachModal({ isOpen, onClose, onApplyPlan, session, athletePro
                                 <div className={`${m.role === 'user' ? 'bg-indigo-600 rounded-2xl rounded-tr-sm text-white' : 'bg-[#18181b] rounded-2xl rounded-tl-sm text-zinc-300 border border-zinc-800'} px-5 py-4 max-w-[92%] shadow-md`}>
 
                                     {m.role === 'ai' ? (
-                                        <div className="prose prose-invert prose-sm prose-p:leading-relaxed prose-pre:bg-black/50 prose-pre:border-zinc-800 max-w-none">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                        <div className="flex flex-col">
+                                            <div className="prose prose-invert prose-sm prose-p:leading-relaxed prose-pre:bg-black/50 prose-pre:border-zinc-800 max-w-none">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                            </div>
+                                            {!m.isGreeting && (
+                                                <button 
+                                                    onClick={() => {
+                                                        const blob = new Blob([m.content], { type: 'text/markdown' });
+                                                        const url = URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = `AI_Coach_Report_${new Date().toISOString().split('T')[0]}.md`;
+                                                        a.click();
+                                                        URL.revokeObjectURL(url);
+                                                    }}
+                                                    className="mt-3 text-[10px] flex items-center gap-1.5 text-zinc-500 hover:text-indigo-400 transition-colors bg-zinc-800/20 hover:bg-zinc-800/60 w-fit px-2 py-1 rounded-md border border-zinc-800/50"
+                                                    title="Descargar informe como documento de texto"
+                                                >
+                                                    <Download className="w-3 h-3" /> Descargar Informe
+                                                </button>
+                                            )}
                                         </div>
                                     ) : (
                                         <p className="text-sm whitespace-pre-wrap">{m.content}</p>
                                     )}
 
-                                    {/* Botón de Aplicar Plan si el mensaje contiene uno */}
-                                    {m.plan && (
-                                        <div className="mt-5 pt-5 border-t border-zinc-800/80">
-                                            <p className="text-[11px] font-bold text-amber-500 mb-2 inline-flex items-center gap-1.5">
-                                                <Sparkles className="w-3 h-3" /> ESQUEMA CALCULADO
-                                            </p>
-                                            <button
-                                                onClick={() => {
-                                                    if (onApplyPlan && m.plan) {
-                                                        // 1. Aplicarlo localmente instantáneo
-                                                        onApplyPlan(m.plan);
-
-                                                        // 2. Guardarlo en la nube en background
-                                                        if (session) {
-                                                            supabase
-                                                                .from('user_schedules')
-                                                                .upsert({ user_id: session.user.id, schedule_data: m.plan })
-                                                                .then(({ error }) => {
-                                                                    if (error) console.error("Error auto-guardando plan AI:", error);
-                                                                });
-                                                        }
-
-                                                        // 3. Cerrar el modal
-                                                        onClose();
-                                                    }
-                                                }}
-                                                className="w-full py-2.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
-                                            >
-                                                Inyectar al Calendario
-                                            </button>
-                                        </div>
-                                    )}
 
                                     {/* Menú Principal Especial si es Saludo */}
                                     {m.isGreeting && m.role === 'ai' && (

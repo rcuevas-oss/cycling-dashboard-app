@@ -5,6 +5,18 @@ import {
   TimeWindows, 
   ValidatedSession 
 } from "../types";
+import { getActivityLocalDate } from "../../metricsUtils";
+
+/**
+ * Builds a local-time Date from an activity_date/start_date field.
+ * Avoids UTC shift: a 22:00 Chile activity stored as next-day UTC
+ * would otherwise appear on the wrong day.
+ */
+function buildLocalDate(dateField: string): Date {
+  const localStr = getActivityLocalDate(dateField);
+  // Use noon local time to avoid DST edge cases at midnight
+  return new Date(localStr + 'T12:00:00');
+}
 
 /**
  * Validates a single dashboard activity based on mechanical/sensor limits.
@@ -17,11 +29,13 @@ function validateActivity(raw: DashboardActivity): ValidatedSession {
   let exclusionReason = "";
 
   // 1. Check for missing critical data
-  if (!raw.moving_time || raw.moving_time < 5) { // less than 5 minutes
+  // moving_time is in SECONDS (confirmed by sessionComparator dividing by 60).
+  // Less than 300 seconds = less than 5 minutes → skip warm-up artifacts.
+  if (!raw.moving_time || raw.moving_time < 300) {
     quality = "inconclusive";
     confidenceScore = 0;
     exclusionReason = "Duración demasiado corta (< 5 min)";
-    return { id: raw.id, date: new Date(raw.start_date), quality, confidenceScore, exclusionReason, raw };
+    return { id: raw.id, date: buildLocalDate(raw.start_date), quality, confidenceScore, exclusionReason, raw };
   }
 
   // 2. Check for impossible sensor readings (Anomalous)
@@ -29,7 +43,7 @@ function validateActivity(raw: DashboardActivity): ValidatedSession {
     quality = "anomalous";
     confidenceScore = 20;
     exclusionReason = "Frecuencia Cardíaca Máxima irreal (> 220 bpm)";
-  } else if (raw.max_speed && raw.max_speed > 35) { // 35 m/s = ~126 km/h. Plausible on descents but highly suspicious for avg
+  } else if (raw.max_speed && raw.max_speed > 35) { // 35 m/s = ~126 km/h
     if (raw.average_speed > 25) { // Avg > 90km/h is definitely a car/GPS error
        quality = "anomalous";
        confidenceScore = 10;
@@ -53,7 +67,7 @@ function validateActivity(raw: DashboardActivity): ValidatedSession {
 
   return {
     id: raw.id,
-    date: new Date(raw.start_date),
+    date: buildLocalDate(raw.start_date),  // Local time to avoid UTC shift
     quality,
     confidenceScore,
     exclusionReason: exclusionReason || undefined,
@@ -68,15 +82,11 @@ function validateActivity(raw: DashboardActivity): ValidatedSession {
 export function executeDataValidation(rawWindows: RawTimeWindows): TimeWindows {
   const recentDays = rawWindows.recentDaysRaw.map(validateActivity);
   const baselineDays = rawWindows.baselineDaysRaw.map(validateActivity);
-  
-  let focusSession: ValidatedSession | undefined;
-  if (rawWindows.focusSessionRaw) {
-    focusSession = validateActivity(rawWindows.focusSessionRaw);
-  }
+  const focusSessions = rawWindows.focusSessionsRaw.map(validateActivity);
 
   return {
     recentDays,
     baselineDays,
-    focusSession
+    focusSessions
   };
 }

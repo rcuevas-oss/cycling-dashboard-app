@@ -36,14 +36,22 @@ export function evaluatePhysiology(
      };
   }
 
-  // 1. Fatigue / Form Analysis (Approximation from Recent Load)
+  // 1. Fatigue / Form Analysis (Approximation from Recent Load — last 7 days)
+  // We only look at the last 7 days because the 400 TSS threshold is a weekly fatigue signal.
+  // Using 14 days would require halving the threshold, which would be confusing and imprecise.
+  const now = new Date();
+  const sevenDaysAgo = new Date(now);
+  sevenDaysAgo.setDate(now.getDate() - 7);
+  const sevenDaysAgoStr = `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth()+1).padStart(2,'0')}-${String(sevenDaysAgo.getDate()).padStart(2,'0')}`;
+
   let recentTSS = 0;
   for (const session of recentDays) {
-     recentTSS += (session.raw.tss || 0);
+    // session.date is already in local time (built with buildLocalDate in dataValidator)
+    const sessionDateStr = `${session.date.getFullYear()}-${String(session.date.getMonth()+1).padStart(2,'0')}-${String(session.date.getDate()).padStart(2,'0')}`;
+    if (sessionDateStr >= sevenDaysAgoStr) {
+      recentTSS += (session.raw.tss || session.raw.training_stress_score || 0);
+    }
   }
-  
-  // Heuristic: If they've done > 400 TSS in the last 7 days, they are probably fatigued
-  // (In a real app, we use exponentially weighted ATL/CTL from the database).
   if (recentTSS > 400) {
       performanceFlag = "fatigue_suspected";
       facts.push({
@@ -99,6 +107,7 @@ export function evaluatePhysiology(
   return {
       performanceFlag,
       facts,
-      decisions
+      decisions,
+      comparableDelta: focusSessionDelta
   };
 }

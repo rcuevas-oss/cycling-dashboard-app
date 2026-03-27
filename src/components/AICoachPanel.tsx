@@ -1,18 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bot, Send, Zap, Flag } from 'lucide-react';
-import { TrainingBlock } from '../lib/fitUtils';
+import { Bot, Send, Zap, Flag, Download } from 'lucide-react';
 import { runCoachPipeline } from '../lib/coach/pipeline';
-import { TRAINING_BLOCKS } from './TrainingPlanner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import { ActivitySummary } from '../lib/activityTypes';
+import { buildCoachActivityDataset } from '../lib/coachActivityAdapter';
 
 interface AICoachPanelProps {
     session: Session;
     athleteProfile?: any;
-    recentActivitiesData?: any[];
-    onApplyPlan?: (plan: Record<string, TrainingBlock[]>) => void;
+    recentActivitiesData?: ActivitySummary[];
     onNavigate?: (view: string) => void;
 }
 
@@ -20,11 +18,10 @@ interface ChatMessage {
     id: string;
     role: 'user' | 'ai';
     content: string;
-    plan?: Record<string, TrainingBlock[]>;
     isGreeting?: boolean;
 }
 
-export function AICoachPanel({ session, athleteProfile, recentActivitiesData, onApplyPlan, onNavigate }: AICoachPanelProps) {
+export function AICoachPanel({ session, athleteProfile, recentActivitiesData, onNavigate: _onNavigate }: AICoachPanelProps) {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
     const [inputMsg, setInputMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -79,77 +76,33 @@ export function AICoachPanel({ session, athleteProfile, recentActivitiesData, on
                 disponibilidad_semanal: athleteProfile?.disponibilidad || "Disponibilidad completa (Acepta cualquier día, asume 1-2h diarias)."
             };
 
-            const hoy = new Date();
-            let tss7d = 0;
-            let tss42d = 0;
-            let mins7d = 0;
-
-            const recentActivities = (recentActivitiesData || []).map(act => {
-                if (act.activity_date) {
-                    const diffTime = Math.abs(hoy.getTime() - new Date(act.activity_date).getTime());
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                    const tss = typeof act.training_stress_score === 'number' ? act.training_stress_score : 0;
-                    const mins = typeof act.duration_minutes === 'number' ? act.duration_minutes : 0;
-
-                    if (diffDays <= 7) {
-                        tss7d += tss;
-                        mins7d += mins;
-                    }
-                    if (diffDays <= 42) {
-                        tss42d += tss;
-                    }
-                }
-
-                return {
-                    id: act.id || Math.random().toString(),
-                    start_date: act.activity_date || new Date().toISOString(),
-                    type: act.type || 'Ride',
-                    distance: act.distance_km ? act.distance_km * 1000 : 0,
-                    moving_time: act.duration_minutes ? act.duration_minutes * 60 : 0,
-                    elapsed_time: act.duration_minutes ? act.duration_minutes * 60 : 0,
-                    total_elevation_gain: act.ascenso_total || 0,
-                    average_speed: 0,
-                    max_speed: 0,
-                    average_heartrate: act.fc_media,
-                    max_heartrate: act.fc_maxima,
-                    normalized_power: act.normalized_power,
-                    training_stress_score: act.training_stress_score,
-                    intensity_factor: undefined,
-                    average_watts: act.potencia_media,
-                    max_watts: act.potencia_maxima,
-                    average_cadence: act.cadencia_media
-                };
-            });
+            const { recentActivities, loadSummary } = buildCoachActivityDataset(recentActivitiesData || []);
 
             const enrichedAthleteContext = {
                 ...athleteContext,
                 analisis_carga_backend: {
-                    tss_ultimos_7_dias_total: tss7d,
-                    tss_promedio_diario_7d: Number((tss7d / 7).toFixed(1)),
-                    volumen_diario_promedio_7d_mins: Number((mins7d / 7).toFixed(0)),
-                    ctl_estimado_42d_promedio: Number((tss42d / 42).toFixed(1)),
-                    nota_tecnica: "Evalúa el progreso y recomienda acciones."
+                    tss_ultimos_7_dias_total: loadSummary.tss7d,
+                    volumen_diario_promedio_7d_mins: loadSummary.volumenPromedio7dMins,
+                    ctl_calculado_ewma_42d: loadSummary.ctl,
+                    atl_calculado_ewma_7d: loadSummary.atl,
+                    tsb_calculado_balance_hoy: loadSummary.tsb,
+                    aviso_crítico: "ATENCIÓN CIENTÍFICO DE DATOS: DEBES usar EXCLUSIVAMENTE los valores ctl_calculado_ewma_42d, atl_calculado_ewma_7d y tsb_calculado_balance_hoy suministrados arriba. NUNCA calcules el ATL o CTL como un promedio simple de 7 o 42 días, ya que el EWMA real requiere una constante estricta."
                 }
             };
 
-            const response = await runCoachPipeline(apiKey, newMsg, enrichedAthleteContext, recentActivities);
+            const historyToPass = messages
+                .filter(m => !m.id.includes('error') && !m.isGreeting)
+                .map(m => ({
+                    role: m.role === 'ai' ? 'model' : 'user' as "user" | "model",
+                    content: m.content
+                }));
 
-            let scheduledPlan: Record<string, TrainingBlock[]> | undefined = undefined;
-            if (response.generatedPlan && response.generatedPlan.length > 0) {
-                 scheduledPlan = {};
-                 response.generatedPlan.forEach(block => {
-                     if (!scheduledPlan![block.date]) scheduledPlan![block.date] = [];
-                     const template = TRAINING_BLOCKS.find(b => b.id === block.block_id);
-                     if (template) scheduledPlan![block.date].push({...template});
-                 });
-            }
+            const response = await runCoachPipeline(apiKey, newMsg, enrichedAthleteContext, recentActivities, historyToPass);
 
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
                 content: response.textMarkdown,
-                plan: scheduledPlan,
                 isGreeting: false
             }]);
         } catch (error: any) {
@@ -284,30 +237,30 @@ Basado matemáticamente en esta relación (TSB), ¿estoy en fase de construcció
                             )}
                             <div className={`${m.role === 'user' ? 'bg-indigo-600 rounded-2xl rounded-tr-sm text-white' : 'bg-[#18181b] rounded-2xl rounded-tl-sm text-zinc-300 border border-zinc-800'} px-5 py-4 max-w-[92%] shadow-md`}>
                                 {m.role === 'ai' ? (
-                                    <div className="prose prose-invert prose-sm prose-p:leading-relaxed prose-pre:bg-black/50 prose-pre:border-zinc-800 max-w-none">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                    <div className="flex flex-col">
+                                        <div className="prose prose-invert prose-sm prose-p:leading-relaxed prose-pre:bg-black/50 prose-pre:border-zinc-800 max-w-none">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                        </div>
+                                        {!m.isGreeting && (
+                                            <button 
+                                                onClick={() => {
+                                                    const blob = new Blob([m.content], { type: 'text/markdown' });
+                                                    const url = URL.createObjectURL(blob);
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = `AI_Coach_Report_${new Date().toISOString().split('T')[0]}.md`;
+                                                    a.click();
+                                                    URL.revokeObjectURL(url);
+                                                }}
+                                                className="mt-3 text-[10px] flex items-center gap-1.5 text-zinc-500 hover:text-indigo-400 transition-colors bg-zinc-800/20 hover:bg-zinc-800/60 w-fit px-2 py-1 rounded-md border border-zinc-800/50"
+                                                title="Descargar informe como documento de texto"
+                                            >
+                                                <Download className="w-3 h-3" /> Descargar Informe
+                                            </button>
+                                        )}
                                     </div>
                                 ) : (
                                     <p className="text-sm whitespace-pre-wrap">{m.content}</p>
-                                )}
-
-                                {m.plan && (
-                                    <div className="mt-5 pt-5 border-t border-zinc-800/80">
-                                        <button
-                                            onClick={() => {
-                                                if (onApplyPlan && m.plan) {
-                                                    onApplyPlan(m.plan);
-                                                    if (session) {
-                                                        supabase.from('user_schedules').upsert({ user_id: session.user.id, schedule_data: m.plan }).then();
-                                                    }
-                                                    if (onNavigate) onNavigate('planner'); // Forzar abrir la vista del planner
-                                                }
-                                            }}
-                                            className="w-full py-2.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
-                                        >
-                                            Inyectar al Tablero
-                                        </button>
-                                    </div>
                                 )}
                             </div>
                         </div>
@@ -335,7 +288,7 @@ Basado matemáticamente en esta relación (TSB), ¿estoy en fase de construcció
             </div>
 
             {/* Quick Prompts (Above Input box for fast action) */}
-            <div className="px-3 pt-2 pb-2 bg-[#111113] flex gap-1.5 overflow-x-auto custom-scrollbar items-center">
+            <div className="px-3 pt-2 pb-2 bg-[#111113] flex gap-1.5 overflow-x-auto custom-scrollbar items-center shrink-0 w-full min-h-[44px]">
                 <button onClick={() => handleSend(promptAuditoria, "📊 Auditoría de Temporada")} className="shrink-0 px-2 py-0.5 bg-zinc-800/50 hover:bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold border border-zinc-700/50 hover:border-indigo-500/50 rounded-full transition-all whitespace-nowrap">
                     📊 Auditoría de Temporada
                 </button>

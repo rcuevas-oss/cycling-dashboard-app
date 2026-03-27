@@ -1,0 +1,175 @@
+.training-node {
+  padding: 16px 16px 14px 20px;
+  border-radius: 14px;
+  width: 280px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+.training-node::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 100%;
+}
+
+.training-node.selected {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5), var(--shadow-glass);
+  transform: translateY(-2px);
+}
+
+.node-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.node-icon {
+  color: var(--text-secondary);
+}
+
+.node-body {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  background: rgba(0,0,0,0.2);
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.node-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.stat-icon {
+  color: var(--text-secondary);
+}
+
+.editable-stat {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  margin-left: -6px;
+}
+
+.editable-stat:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.15);
+}
+
+.editable-value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.edit-icon {
+  opacity: 0.3;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.editable-stat:hover .edit-icon {
+  opacity: 1;
+  color: #007cc3; /* garmin-blue */
+}
+
+.node-footer {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* Original left-border logic replaced by full colored blocks */
+.zone-rest::before { background-color: #a1a1aa; }
+.zone-rest { background-color: rgba(161, 161, 170, 0.15); border-color: rgba(161, 161, 170, 0.4); }
+
+.zone-recovery::before { background-color: #3b82f6; }
+.zone-recovery { background-color: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); }
+
+.zone-endurance::before { background-color: #10b981; }
+.zone-endurance { background-color: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); }
+
+.zone-tempo::before { background-color: #f59e0b; }
+.zone-tempo { background-color: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); }
+
+.zone-threshold::before { background-color: #ea580c; }
+.zone-threshold { background-color: rgba(234, 88, 12, 0.15); border-color: rgba(234, 88, 12, 0.4); }
+
+.zone-vo2max::before { background-color: #ef4444; }
+.zone-vo2max { background-color: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); }
+
+.zone-anaerobic::before { background-color: #a855f7; }
+.zone-anaerobic { background-color: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); }
+
+/* Handles */
+.handle {
+  width: 14px;
+  height: 24px;
+  background: var(--bg-surfaces);
+  border: 2px solid var(--accent-color);
+  border-radius: 6px;
+  transition: all 0.2s;
+  box-shadow: 0 0 0 2px var(--bg-color);
+  z-index: 10;
+}
+
+.handle:hover {
+  background: var(--accent-color);
+  transform: scale(1.1);
+}
+
+.handle-target {
+  left: -7px;
+}
+
+.handle-source {
+  right: -7px;
+}
+
+/* Delete Button */
+.node-delete-btn {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-surfaces-hover);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 20;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.training-node:hover .node-delete-btn,
+.athlete-node:hover .node-delete-btn {
+  opacity: 1;
+}
+
+.node-delete-btn:hover {
+  background: #f43f5e; /* striking red */
+  color: white;
+  border-color: #f43f5e;
+  opacity: 1;
+  transform: scale(1.15);
+}

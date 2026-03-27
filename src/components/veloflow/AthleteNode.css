@@ -1,0 +1,100 @@
+.athlete-node {
+  padding: 20px;
+  border-radius: 14px;
+  width: 300px;
+  border: 2px solid var(--accent-color);
+  background: var(--bg-surfaces);
+  position: relative;
+  transition: all 0.2s;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+  backdrop-filter: blur(8px);
+}
+
+.athlete-node.selected {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3), 0 4px 20px rgba(56, 189, 248, 0.2);
+}
+
+.athlete-header {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.athlete-header .node-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.athlete-body {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.athlete-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: var(--bg-color);
+  padding: 8px 12px;
+  border-radius: 8px;
+  flex: 1;
+}
+
+.athlete-stat span {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.athlete-stat strong {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.athlete-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.ctl-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(56, 189, 248, 0.12); /* sky blue – CTL standard */
+  color: #38bdf8;
+  padding: 8px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.ctl-info {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+  font-style: italic;
+}
+
+.athlete-handle {
+  width: 16px;
+  height: 32px;
+  background: var(--accent-color);
+  border: 2px solid var(--bg-color);
+  border-radius: 8px;
+  right: -8px;
+}
+
+.athlete-handle:hover {
+  transform: scale(1.1);
+  background: #38bdf8;
+}
